@@ -42,7 +42,6 @@ namespace AGS.Editor
         public const string OUTPUT_DIRECTORY = "Compiled";
         public const string DATA_OUTPUT_DIRECTORY = "Data"; // subfolder in OUTPUT_DIRECTORY for data file outputs
         public const string DEBUG_OUTPUT_DIRECTORY = "_Debug";
-        //public const string DEBUG_EXE_FILE_NAME = "_debug.exe";
         public const string GAME_FILE_NAME = "Game.agf";
 		public const string BACKUP_EXTENSION = "bak";
         public const string OLD_GAME_FILE_NAME = "ac2game.dta";
@@ -103,13 +102,15 @@ namespace AGS.Editor
          * 3.6.0.20       - Settings.GameTextEncoding, Settings.UseOldKeyboardHandling;
          * 3.6.1.2        - GUIListBox.Translated property moved to GUIControl parent
          * 3.6.1.3        - RuntimeSetup.TextureCache, SoundCache
+         * 3.6.1.9        - Settings.ScaleCharacterSpriteOffsets
          * 
          * 3.99.99.00     - BlendMode for various objects, Character.Transparency.
          * 3.99.99.01     - Open rooms
          * 3.99.99.07     - PO translations
+         * 4.00.00.00     - Raised for org purposes without project changes
          *
         */
-        public const int    LATEST_XML_VERSION_INDEX = 3999907;
+        public const int    LATEST_XML_VERSION_INDEX = 4000000;
         /// <summary>
         /// XML version index on the release of AGS 4.0.0, this constant be used to determine
         /// if upgrade of Rooms/Sprites/etc. to new format have been performed.
@@ -970,15 +971,6 @@ namespace AGS.Editor
             return messagesToReturn;
         }
 
-        private void DeleteAnyExistingSplitResourceFiles()
-        {
-            string dir = Path.Combine(OUTPUT_DIRECTORY, DATA_OUTPUT_DIRECTORY);
-            foreach (string fileName in Utilities.GetDirectoryFileList(dir, this.BaseGameFileName + ".0*"))
-            {
-                Utilities.TryDeleteFile(fileName);
-            }
-        }
-
         private void CreateAudioVOXFile(bool forceRebuild)
         {
             List<string> fileListForVox = new List<string>();
@@ -1022,6 +1014,10 @@ namespace AGS.Editor
             var buildNames = Factory.AGSEditor.CurrentGame.WorkspaceState.GetLastBuildGameFiles();
             foreach (IBuildTarget target in BuildTargetsInfo.GetSelectedBuildTargets())
             {
+                // Primary cleanup
+                target.DeleteMainGameData(Factory.AGSEditor.BaseGameFileName);
+
+                // Old files cleanup (if necessary)
                 string oldName;
                 if (!buildNames.TryGetValue(target.Name, out oldName)) continue;
                 if (!string.IsNullOrWhiteSpace(oldName) && oldName != Factory.AGSEditor.BaseGameFileName)
@@ -1276,6 +1272,9 @@ namespace AGS.Editor
             string oldName;
             if (buildNames.TryGetValue(target.Name, out oldName))
             {
+                // Primary cleanup
+                target.DeleteMainGameData(Factory.AGSEditor.BaseGameFileName);
+                // Old files cleanup (if necessary)
                 if (!string.IsNullOrWhiteSpace(oldName) && oldName != Factory.AGSEditor.BaseGameFileName)
                     target.DeleteMainGameData(oldName);
             }
@@ -1447,7 +1446,7 @@ namespace AGS.Editor
             return result;
         }
 
-        private void WriteCustomPathToConfig(string section, string key, string cfg_path, bool use_custom_path, string custom_path)
+        private string CustomPathForConfig(bool use_custom_path, string custom_path)
         {
             string path_value = ""; // no value
             if (use_custom_path)
@@ -1457,7 +1456,7 @@ namespace AGS.Editor
                 else
                     path_value = custom_path;
             }
-            NativeProxy.WritePrivateProfileString(section, key, path_value, cfg_path);
+            return path_value;
         }
 
         private static string GetGfxDriverConfigID(GraphicsDriver driver)
@@ -1491,64 +1490,74 @@ namespace AGS.Editor
 		{
             if (resetFile)
                 Utilities.TryDeleteFile(configFilePath);
-            NativeProxy.WritePrivateProfileString("misc", "game_width", _game.Settings.CustomResolution.Width.ToString(), configFilePath);
-            NativeProxy.WritePrivateProfileString("misc", "game_height", _game.Settings.CustomResolution.Height.ToString(), configFilePath);
-            NativeProxy.WritePrivateProfileString("misc", "gamecolordepth", (((int)_game.Settings.ColorDepth) * 8).ToString(), configFilePath);
+            var sections = new Dictionary<string, Dictionary<string, string>>();
+            sections.Add("graphics", new Dictionary<string, string>());
+            sections.Add("language", new Dictionary<string, string>());
+            sections.Add("misc", new Dictionary<string, string>());
+            sections.Add("mouse", new Dictionary<string, string>());
+            sections.Add("sound", new Dictionary<string, string>());
+            sections.Add("touch", new Dictionary<string, string>());
 
-            NativeProxy.WritePrivateProfileString("graphics", "driver", GetGfxDriverConfigID(_game.DefaultSetup.GraphicsDriver), configFilePath);
-            NativeProxy.WritePrivateProfileString("graphics", "windowed", _game.DefaultSetup.Windowed ? "1" : "0", configFilePath);
-            NativeProxy.WritePrivateProfileString("graphics", "fullscreen",
-                _game.DefaultSetup.FullscreenDesktop ? "full_window" : "desktop", configFilePath);
+            sections["misc"]["game_width"] = _game.Settings.CustomResolution.Width.ToString();
+            sections["misc"]["game_height"] = _game.Settings.CustomResolution.Height.ToString();
+            sections["misc"]["gamecolordepth"] = (((int)_game.Settings.ColorDepth) * 8).ToString();
+
+            sections["graphics"]["driver"] = GetGfxDriverConfigID(_game.DefaultSetup.GraphicsDriver);
+            sections["graphics"]["windowed"] = _game.DefaultSetup.Windowed ? "1" : "0";
+            sections["graphics"]["fullscreen"] =
+                _game.DefaultSetup.FullscreenDesktop ? "full_window" : "desktop";
             if (_game.DefaultSetup.GameScaling == GameScaling.Integer)
-                NativeProxy.WritePrivateProfileString("graphics", "window",
-                    String.Format("x{0}", _game.DefaultSetup.GameScalingMultiplier), configFilePath);
+                sections["graphics"]["window"] =
+                    String.Format("x{0}", _game.DefaultSetup.GameScalingMultiplier);
             else
-                NativeProxy.WritePrivateProfileString("graphics", "window", "desktop", configFilePath);
+                sections["graphics"]["window"] = "desktop";
 
-            NativeProxy.WritePrivateProfileString("graphics", "game_scale_fs", MakeGameScalingConfig(_game.DefaultSetup.FullscreenGameScaling), configFilePath);
-            NativeProxy.WritePrivateProfileString("graphics", "game_scale_win", MakeGameScalingConfig(_game.DefaultSetup.GameScaling), configFilePath);
+            sections["graphics"]["game_scale_fs"] = MakeGameScalingConfig(_game.DefaultSetup.FullscreenGameScaling);
+            sections["graphics"]["game_scale_win"] = MakeGameScalingConfig(_game.DefaultSetup.GameScaling);
 
-            NativeProxy.WritePrivateProfileString("graphics", "filter", _game.DefaultSetup.GraphicsFilter, configFilePath);
-            NativeProxy.WritePrivateProfileString("graphics", "vsync", _game.DefaultSetup.VSync ? "1" : "0", configFilePath);
-            NativeProxy.WritePrivateProfileString("misc", "antialias", _game.DefaultSetup.AAScaledSprites ? "1" : "0", configFilePath);
+            sections["graphics"]["filter"] = _game.DefaultSetup.GraphicsFilter;
+            sections["graphics"]["vsync"] = _game.DefaultSetup.VSync ? "1" : "0";
+            sections["misc"]["antialias"] = _game.DefaultSetup.AAScaledSprites ? "1" : "0";
             bool render_at_screenres = _game.Settings.RenderAtScreenResolution == RenderAtScreenResolution.UserDefined ?
                 _game.DefaultSetup.RenderAtScreenResolution : _game.Settings.RenderAtScreenResolution == RenderAtScreenResolution.True;
-            NativeProxy.WritePrivateProfileString("graphics", "render_at_screenres", render_at_screenres ? "1" : "0", configFilePath);
+            sections["graphics"]["render_at_screenres"] = render_at_screenres ? "1" : "0";
             string[] rotation_str = new string[] { "unlocked", "portrait", "landscape" };
-            NativeProxy.WritePrivateProfileString("graphics", "rotation", rotation_str[(int)_game.DefaultSetup.Rotation], configFilePath);
+            sections["graphics"]["rotation"] = rotation_str[(int)_game.DefaultSetup.Rotation];
 
             bool audio_enabled = _game.DefaultSetup.DigitalSound != RuntimeAudioDriver.Disabled;
-            NativeProxy.WritePrivateProfileString("sound", "enabled", audio_enabled ? "1" : "0", configFilePath);
-            NativeProxy.WritePrivateProfileString("sound", "driver", "", configFilePath); // always default
-            NativeProxy.WritePrivateProfileString("sound", "usespeech", _game.DefaultSetup.UseVoicePack ? "1" : "0", configFilePath);
+            sections["sound"]["enabled"] = audio_enabled ? "1" : "0";
+            sections["sound"]["driver"] = ""; // always default
+            sections["sound"]["usespeech"] = _game.DefaultSetup.UseVoicePack ? "1" : "0";
 
-            NativeProxy.WritePrivateProfileString("language", "translation", _game.DefaultSetup.Translation, configFilePath);
-            NativeProxy.WritePrivateProfileString("mouse", "auto_lock", _game.DefaultSetup.AutoLockMouse ? "1" : "0", configFilePath);
-            NativeProxy.WritePrivateProfileString("mouse", "speed", _game.DefaultSetup.MouseSpeed.ToString(CultureInfo.InvariantCulture), configFilePath);
+            sections["language"]["translation"] = _game.DefaultSetup.Translation;
+            sections["mouse"]["auto_lock"] = _game.DefaultSetup.AutoLockMouse ? "1" : "0";
+            sections["mouse"]["speed"] = _game.DefaultSetup.MouseSpeed.ToString(CultureInfo.InvariantCulture);
 
             // Touch input
             string[] emulate_mouse_str = new string[] { "off", "one_finger", "two_fingers" };
-            NativeProxy.WritePrivateProfileString("touch", "emul_mouse_mode",
-                emulate_mouse_str[(int)_game.DefaultSetup.TouchToMouseEmulation], configFilePath);
-            NativeProxy.WritePrivateProfileString("touch", "emul_mouse_relative",
-                ((int)_game.DefaultSetup.TouchToMouseMotionMode).ToString(), configFilePath);
+            sections["touch"]["emul_mouse_mode"] =
+                emulate_mouse_str[(int)_game.DefaultSetup.TouchToMouseEmulation];
+            sections["touch"]["emul_mouse_relative"] =
+                ((int)_game.DefaultSetup.TouchToMouseMotionMode).ToString();
 
             // Note: the cache sizes are written in KB (while we have it in MB on the editor pane)
-            NativeProxy.WritePrivateProfileString("graphics", "sprite_cache_size", (_game.DefaultSetup.SpriteCacheSize * 1024).ToString(), configFilePath);
-            NativeProxy.WritePrivateProfileString("graphics", "texture_cache_size", (_game.DefaultSetup.TextureCacheSize * 1024).ToString(), configFilePath);
-            NativeProxy.WritePrivateProfileString("sound", "cache_size", (_game.DefaultSetup.SoundCacheSize * 1024).ToString(), configFilePath);
+            sections["graphics"]["sprite_cache_size"] = (_game.DefaultSetup.SpriteCacheSize * 1024).ToString();
+            sections["graphics"]["texture_cache_size"] = (_game.DefaultSetup.TextureCacheSize * 1024).ToString();
+            sections["sound"]["cache_size"] = (_game.DefaultSetup.SoundCacheSize * 1024).ToString();
 
-            WriteCustomPathToConfig("misc", "user_data_dir", configFilePath, _game.DefaultSetup.UseCustomSavePath, _game.DefaultSetup.CustomSavePath);
-            WriteCustomPathToConfig("misc", "shared_data_dir", configFilePath, _game.DefaultSetup.UseCustomAppDataPath, _game.DefaultSetup.CustomAppDataPath);
-            NativeProxy.WritePrivateProfileString("misc", "titletext", _game.DefaultSetup.TitleText, configFilePath);
+            sections["misc"]["user_data_dir"] = CustomPathForConfig(_game.DefaultSetup.UseCustomSavePath, _game.DefaultSetup.CustomSavePath);
+            sections["misc"]["shared_data_dir"] = CustomPathForConfig(_game.DefaultSetup.UseCustomAppDataPath, _game.DefaultSetup.CustomAppDataPath);
+            sections["misc"]["titletext"] = _game.DefaultSetup.TitleText;
 
             if(_game.Settings.DebugMode) // Do not write show_fps in a release build, this is only intended for the developer
             {
-                NativeProxy.WritePrivateProfileString("misc", "show_fps", _game.DefaultSetup.ShowFPS ? "1" : "0", configFilePath);
+                sections["misc"]["show_fps"] = _game.DefaultSetup.ShowFPS ? "1" : "0";
             }
+
+            NativeProxy.Instance.WriteIniFile(configFilePath, sections, true);
         }
 
-        private void SaveUserDataFile()
+        public void SaveUserDataFile()
         {
             StringWriter sw = new StringWriter();
             XmlTextWriter writer = new XmlTextWriter(sw);

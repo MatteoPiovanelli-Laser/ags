@@ -323,7 +323,7 @@ enum DirectionalLoop
 
 // Internal direction-facing functions
 
-DirectionalLoop GetDirectionalLoop(CharacterInfo *chinfo, int x_diff, int y_diff)
+DirectionalLoop GetDirectionalLoop(CharacterInfo *chinfo, float x_diff, float y_diff)
 {
     DirectionalLoop next_loop = kDirLoop_Left; // NOTE: default loop was Left for some reason
 
@@ -549,7 +549,7 @@ int Character_IsCollidingWithObject(CharacterInfo *chin, ScriptObject *objid) {
     int charWidth = charpic->GetWidth();
     int charHeight = charpic->GetHeight();
     int o2x = chin->x - charWidth / 2;
-    int o2y = chin->get_effective_y() - 5;  // only check feet
+    int o2y = charextra[chin->index_id].GetEffectiveY(chin) - 5;  // only check feet
 
     if ((o2x >= o1x - charWidth) &&
         (o2x <= o1x + objWidth) &&
@@ -898,20 +898,23 @@ void Character_SetSpeed(CharacterInfo *chaa, int xspeed, int yspeed) {
 
     if ((xspeed == 0) || (yspeed == 0))
         quit("!SetCharacterSpeedEx: invalid speed value");
-    if (chaa->walking)
-    {
-        debug_script_warn("Character_SetSpeed: cannot change speed while walking");
-        return;
-    }
+
     xspeed = Math::Clamp(xspeed, (int)INT16_MIN, (int)INT16_MAX);
     yspeed = Math::Clamp(yspeed, (int)INT16_MIN, (int)INT16_MAX);
 
-    chaa->walkspeed = xspeed;
+    uint16_t old_speedx = chaa->walkspeed;
+    uint16_t old_speedy = ((chaa->walkspeed_y == UNIFORM_WALK_SPEED) ? chaa->walkspeed : chaa->walkspeed_y);
 
+    chaa->walkspeed = xspeed;
     if (yspeed == xspeed) 
         chaa->walkspeed_y = UNIFORM_WALK_SPEED;
     else
         chaa->walkspeed_y = yspeed;
+
+    if (chaa->walking > 0)
+    {
+        recalculate_move_speeds(&mls[chaa->walking % TURNING_AROUND], old_speedx, old_speedy, xspeed, yspeed);
+    }
 }
 
 
@@ -1702,11 +1705,16 @@ void walk_character(int chac,int tox,int toy,int ignwal, bool autoWalkAnims) {
     // moving it looks smoother
     int oldframe = chin->frame;
     int waitWas = 0, animWaitWas = 0;
+    float wasStepFrac = 0.f;
     // if they are currently walking, save the current Wait
     if (chin->walking)
     {
         waitWas = chin->walkwait;
         animWaitWas = charextra[chac].animwait;
+        const auto &movelist = mls[chin->walking % TURNING_AROUND];
+        // We set (fraction + 1), because movelist is always +1 ahead of current character pos;
+        if (movelist.onpart > 0.f)
+            wasStepFrac = movelist.GetPixelUnitFraction() + movelist.GetStepLength();
     }
 
     StopMoving (chac);
@@ -1731,6 +1739,11 @@ void walk_character(int chac,int tox,int toy,int ignwal, bool autoWalkAnims) {
         chin->walking = mslot;
         mls[mslot].direct = ignwal;
         convert_move_path_to_room_resolution(&mls[mslot]);
+
+        if (wasStepFrac > 0.f)
+        {
+            mls[mslot].SetPixelUnitFraction(wasStepFrac);
+        }
 
         // cancel any pending waits on current animations
         // or if they were already moving, keep the current wait - 
@@ -1832,7 +1845,7 @@ void fix_player_sprite(MoveList*cmls,CharacterInfo*chinf) {
     const float ypmove = cmls->ypermove[cmls->onstage];
 
     // if not moving, do nothing
-    if ((xpmove == 0) && (ypmove == 0))
+    if ((xpmove == 0.f) && (ypmove == 0.f))
         return;
 
     const int useloop = GetDirectionalLoop(chinf, xpmove, ypmove);
@@ -1912,8 +1925,8 @@ int doNextCharMoveStep (CharacterInfo *chi, int &char_index, CharacterExtras *ch
         }
 
         if ((chi->walking < 1) || (chi->walking >= TURNING_AROUND)) ;
-        else if (mls[chi->walking].onpart > 0) {
-            mls[chi->walking].onpart --;
+        else if (mls[chi->walking].onpart > 0.f) {
+            mls[chi->walking].onpart -= 1.f;
             chi->x = xwas;
             chi->y = ywas;
         }
@@ -2231,10 +2244,11 @@ void update_character_scale(int charid)
     }
 
     const int pic = views[chin.view].loops[chin.loop].frames[chin.frame].pic;
-    int zoom, scale_width, scale_height;
+    int zoom, zoom_offs, scale_width, scale_height;
     update_object_scale(zoom, scale_width, scale_height,
         chin.x, chin.y, pic,
         chex.zoom, (chin.flags & CHF_MANUALSCALING) == 0);
+    zoom_offs = (game.options[OPT_SCALECHAROFFSETS] != 0) ? zoom : 100;
 
     // Save calculated properties and recalc GS
     chex.zoom = zoom;
@@ -2242,6 +2256,7 @@ void update_character_scale(int charid)
     chex.spr_height = game.SpriteInfos[pic].Height;
     chex.width = scale_width;
     chex.height = scale_height;
+    chex.zoom_offs = zoom_offs;
     chex.UpdateGraphicSpace(&chin);
 }
 
@@ -2549,8 +2564,8 @@ void _displayspeech(const char*texx, int aschar, int xx, int yy, int widd, int i
         {
             int sppic = views[speakingChar->view].loops[speakingChar->loop].frames[0].pic;
             int height = (charextra[aschar].height < 1) ? game.SpriteInfos[sppic].Height : charextra[aschar].height;
-            tdyp = view->RoomToScreen(0, game.chars[aschar].get_effective_y() - height).first.Y
-                    - 5;
+            tdyp = view->RoomToScreen(0, charextra[aschar].GetEffectiveY(speakingChar) - height).first.Y
+                - 5;
             if (isThought) // if it's a thought, lift it a bit further up
                 tdyp -= 10;
         }
@@ -2927,6 +2942,15 @@ int update_lip_sync(int talkview, int talkloop, int *talkframeptr) {
 
     talkframeptr[0] = talkframe;
     return talkwait;
+}
+
+void restore_characters()
+{
+    for (int i = 0; i < game.numcharacters; ++i)
+    {
+        charextra[i].zoom_offs = (game.options[OPT_SCALECHAROFFSETS] != 0) ?
+            charextra[i].zoom : 100;
+    }
 }
 
 Rect GetCharacterRoomBBox(int charid, bool use_frame_0)

@@ -21,6 +21,7 @@
 #include "ac/character.h"
 #include "ac/characterextras.h"
 #include "ac/draw.h"
+#include "ac/game.h"
 #include "ac/gamestate.h"
 #include "ac/gamesetupstruct.h"
 #include "ac/global_character.h"
@@ -28,6 +29,7 @@
 #include "ac/movelist.h"
 #include "ac/overlay.h"
 #include "ac/screenoverlay.h"
+#include "ac/spritecache.h"
 #include "ac/sys_events.h"
 #include "ac/roomobject.h"
 #include "ac/roomstatus.h"
@@ -61,129 +63,72 @@ extern std::vector<SpeechLipSyncLine> splipsync;
 extern int numLipLines, curLipLine, curLipLinePhoneme;
 extern IGraphicsDriver *gfxDriver;
 
-// specific implementation for do_movelist_move, until we understand better the algorithm and what precision is required
-bool movelist_float_equals(float a, float b) {
-  return fabs(a - b) < 0.0001;
-}
 
 // Receives and modifies movelist_id and entity coordinates
 // Returns whether to there's a need to update the sprite due to a change in direction
-int do_movelist_move(short &movelist_id, int &xx, int &yy) {
-  // TODO: make sense of contradicting comments
-  int need_to_fix_sprite=0;
-  if (movelist_id<1) quit("movelist_move: attempted to move on a non-existent movelist");
-  MoveList* cmls = &mls[movelist_id];
-  float xpermove=cmls->xpermove[cmls->onstage],ypermove=cmls->ypermove[cmls->onstage];
+int do_movelist_move(short &mslot, int &pos_x, int &pos_y)
+{
+    // TODO: find out why movelist 0 is not being used
+    assert(mslot >= 1);
+    if (mslot < 1)
+        return 0;
 
-  int targetx = cmls->pos[cmls->onstage+1].X;
-  int targety = cmls->pos[cmls->onstage+1].Y;
-  int xps=xx, yps=yy; // the new position that will be assigned to xx and yy
-  if (cmls->doneflag & kMoveListDone_X) {
-    // if the X-movement has finished, and the Y-per-move is < 1, finish
-    // This can cause jump at the end, but without it the character will
-    // walk on the spot for a while if the Y-per-move is for example 0.2
-//    if ((ypermove & 0xfffff000) == 0) cmls->doneflag|=2;
-//    int ypmm=(ypermove >> 16) & 0x0000ffff;
+    int need_to_fix_sprite = 0; // TODO: find out what this value means and refactor
+    MoveList &cmls = mls[mslot];
+    const float xpermove = cmls.xpermove[cmls.onstage];
+    const float ypermove = cmls.ypermove[cmls.onstage];
+    const float onpart = cmls.onpart;
+    Point target = cmls.pos[cmls.onstage + 1];
+    // the new position that will be assigned to pos_x and pos_y
+    int xps = pos_x, yps = pos_y;
 
-    // NEW 2.15 SR-1 plan: if X-movement has finished, and Y-per-move is < 1,
-    // allow it to finish more easily by moving target zone
+    // Calculate next positions
+    xps = cmls.from.X + (int)(xpermove * onpart);
+    yps = cmls.from.Y + (int)(ypermove * onpart);
 
-    int adjAmnt = 3;
-    // 2.70: if the X permove is also <=1, don't do the skipping
-    if ((trunc(xpermove) == -1) ||
-        (trunc(xpermove) == 0) )
-      adjAmnt = 2;
+    // Check if finished either horizontal or vertical movement;
+    // snap to the target (in case run over)
+    if (((xpermove > 0) && (xps >= target.X)) || ((xpermove < 0) && (xps <= target.X)))
+        xps = target.X;
+    if (((ypermove > 0) && (yps >= target.Y)) || ((ypermove < 0) && (yps <= target.Y)))
+        yps = target.Y;
+    // NOTE: since we're using floats now, let's assume that xps and yps will
+    // reach target with proper timing, in accordance to their speeds.
+    // If something goes wrong on big distances with very sharp angles,
+    // we may restore one of the old fixups, like, snap at a remaining 1 px.
 
-    // 2.61 RC1: correct this to work with > -1 as well as < 1
-    if (movelist_float_equals(ypermove, 0)) { }
-    // Y per move is < 1, so finish the move
-    else if (trunc(ypermove) == 0)
-      targety -= adjAmnt;
-    // Y per move is -1 exactly, don't snap to finish
-    else if (movelist_float_equals(ypermove, -1)) { }
-    // Y per move is > -1, so finish the move
-    else if (trunc(ypermove) == -1)
-      targety += adjAmnt;
-  }
-  else xps=cmls->fromx+(int)(xpermove*(float)cmls->onpart);
+    // Handle end of move stage
+    if (xps == target.X && yps == target.Y)
+    {
+        // this stage is done, go on to the next stage
+        cmls.from = cmls.pos[cmls.onstage + 1];
+        cmls.onstage++;
+        cmls.onpart = -1.f;
+        cmls.doneflag = 0;
+        if (cmls.onstage < cmls.numstage)
+        {
+            xps = cmls.from.X;
+            yps = cmls.from.Y;
+        }
 
-  if (cmls->doneflag & kMoveListDone_Y) {
-    // Y-movement has finished
-
-    int adjAmnt = 3;
-
-    // if the Y permove is also <=1, don't skip as far
-    if ((trunc(ypermove) == -1) ||
-        (trunc(ypermove) == 0))
-      adjAmnt = 2;
-
-    if (movelist_float_equals(xpermove, 0)) { }
-    // Y per move is < 1, so finish the move
-    else if (trunc(xpermove) == 0)
-      targetx -= adjAmnt;
-    // X per move is -1 exactly, don't snap to finish
-    else if (movelist_float_equals(xpermove, -1)) { }
-    // X per move is > -1, so finish the move
-    else if (trunc(xpermove) == -1)
-      targetx += adjAmnt;
-
-/*    int xpmm=(xpermove >> 16) & 0x0000ffff;
-//    if ((xpmm==0) | (xpmm==0xffff)) cmls->doneflag|=1;
-    if (xpmm==0) cmls->doneflag|=1;*/
-  }
-  else yps=cmls->fromy+(int)(ypermove*(float)cmls->onpart);
-
-  // check if finished horizontal movement
-  if (((xpermove > 0) && (xps >= targetx)) ||
-      ((xpermove < 0) && (xps <= targetx))) {
-    cmls->doneflag |= kMoveListDone_X;
-    xps = targetx;
-    // if the Y is almost there too, finish it
-    // this is new in v2.40
-    // removed in 2.70
-    /*if (abs(yps - targety) <= 2)
-      yps = targety;*/
-  }
-  else if (xpermove == 0)
-    cmls->doneflag |= kMoveListDone_X;
-
-  // check if finished vertical movement
-  if ((ypermove > 0) & (yps>=targety)) {
-    cmls->doneflag |= kMoveListDone_Y;
-    yps = targety;
-  }
-  else if ((ypermove < 0) & (yps<=targety)) {
-    cmls->doneflag |= kMoveListDone_Y;
-    yps = targety;
-  }
-  else if (ypermove == 0)
-    cmls->doneflag |= kMoveListDone_Y;
-
-  if ((cmls->doneflag & kMoveListDone_XY) == kMoveListDone_XY) {
-    // this stage is done, go on to the next stage
-    cmls->fromx=cmls->pos[cmls->onstage+1].X;
-    cmls->fromy=cmls->pos[cmls->onstage+1].Y;
-
-    cmls->onstage++;
-    cmls->onpart = -1;
-    cmls->doneflag = 0; // this used to clear only the lower 4 bits, but no upper bit was ever assigned in the first place
-    cmls->lastx = -1;
-    if (cmls->onstage < cmls->numstage) {
-      xps=cmls->fromx; yps=cmls->fromy;
+        if (cmls.onstage >= cmls.numstage - 1)
+        {  // last stage is just dest pos
+            cmls.numstage=0;
+            mslot = 0; // movelist 0 means "not moving/walking"
+            need_to_fix_sprite = 1; // WARNING: value 1 is not used anywhere, could be a mistake
+        }
+        else
+        {
+            need_to_fix_sprite = 2; // used to request a sprite direction update
+        }
     }
-    if (cmls->onstage>=cmls->numstage-1) {  // last stage is just dest pos
-      cmls->numstage = 0;
-      movelist_id = 0; // movelist 0 means "not moving/walking"
-      need_to_fix_sprite = 1; // WARNING: value 1 is not used anywhere, could be a mistake
-    }
-    else need_to_fix_sprite = 2; // used to request a sprite direction update
-  }
-  cmls->onpart++;
-  xx = xps;
-  yy = yps;
-  return need_to_fix_sprite;
+
+    // Make a step along the current vector and return
+    cmls.onpart += 1.f;
+    pos_x = xps;
+    pos_y = yps;
+    return need_to_fix_sprite;
 }
-
 
 void update_script_timers()
 {
@@ -286,7 +231,7 @@ void update_speech_and_messages()
     {
         if (!play.speech_in_post_state)
         {
-            play.messagetime = ::lround(play.speech_display_post_time_ms * get_current_fps() / 1000.0f);
+            play.messagetime = ::lround(play.speech_display_post_time_ms * get_game_fps() / 1000.0f);
         }
         play.speech_in_post_state = !play.speech_in_post_state;
     }
@@ -439,7 +384,7 @@ void update_sierra_speech()
 
       auto *face_over = get_overlay(face_talking);
       assert(face_over != nullptr);
-      Bitmap *frame_pic = face_over->GetImage();
+      Bitmap *frame_pic = spriteset[face_over->GetSpriteNum()];
       if (game.options[OPT_SPEECHTYPE] == 3) {
         // QFG4-style fullscreen dialog
         if (facetalk_qfg4_override_placement_x)
@@ -469,6 +414,8 @@ void update_sierra_speech()
         DrawViewFrame(frame_pic, blink_vf, view_frame_x, view_frame_y);
       }
 
+      // Make sure overlay texture will get updated on screen
+      game_sprite_updated(face_over->GetSpriteNum());
       face_over->MarkChanged();
     }  // end if updatedFrame
   }

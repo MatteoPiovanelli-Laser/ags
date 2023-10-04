@@ -376,6 +376,14 @@ HSaveError WriteAudio(Stream *out)
     return HSaveError::None();
 }
 
+// Savegame data format for RoomStatus
+enum AudioSvgVersion
+{
+    kAudioSvgVersion_Initial  = 0,
+    kAudioSvgVersion_35026    = 1, // source position settings
+    kAudioSvgVersion_36009    = 2, // up number of channels
+};
+
 HSaveError ReadAudio(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/, RestoredData &r_data)
 {
     HSaveError err;
@@ -383,7 +391,7 @@ HSaveError ReadAudio(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/,
     if (!AssertGameContent(err, in->ReadInt32(), game.audioClipTypes.size(), "Audio Clip Types"))
         return err;
     int total_channels, max_game_channels;
-    if (cmp_ver >= 2)
+    if (cmp_ver >= kAudioSvgVersion_36009)
     {
         total_channels = in->ReadInt8();
         max_game_channels = in->ReadInt8();
@@ -423,7 +431,7 @@ HSaveError ReadAudio(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/,
             chan_info.Pan = in->ReadInt32();
             chan_info.Speed = 1000;
             chan_info.Speed = in->ReadInt32();
-            if (cmp_ver >= 1)
+            if (cmp_ver >= kAudioSvgVersion_35026)
             {
                 chan_info.XSource = in->ReadInt32();
                 chan_info.YSource = in->ReadInt32();
@@ -447,31 +455,6 @@ HSaveError ReadAudio(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/,
         in->ReadInt32();
         in->ReadInt32();
         in->ReadInt32();
-    }
-    return err;
-}
-
-HSaveError WriteMoveLists(Stream *out)
-{
-    out->WriteInt32(static_cast<int32_t>(mls.size()));
-    for (const auto &movelist : mls)
-    {
-        movelist.WriteToFile(out);
-    }
-    return HSaveError::None();
-}
-
-HSaveError ReadMoveLists(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/, RestoredData& /*r_data*/)
-{
-    HSaveError err;
-    size_t movelist_count = in->ReadInt32();
-    if (!AssertGameContent(err, movelist_count, mls.size(), "Move Lists"))
-        return err;
-    for (size_t i = 0; i < movelist_count; ++i)
-    {
-        err = mls[i].ReadFromFile(in, cmp_ver);
-        if (!err)
-            return err;
     }
     return err;
 }
@@ -1026,6 +1009,35 @@ HSaveError ReadThisRoom(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp
     return HSaveError::None();
 }
 
+HSaveError WriteMoveLists(Stream *out)
+{
+    out->WriteInt32(static_cast<int32_t>(mls.size()));
+    for (const auto &movelist : mls)
+    {
+        movelist.WriteToFile(out);
+    }
+    return HSaveError::None();
+}
+
+HSaveError ReadMoveLists(Stream *in, int32_t cmp_ver, const PreservedParams& /*pp*/, RestoredData& /*r_data*/)
+{
+    HSaveError err;
+    size_t movelist_count = in->ReadInt32();
+    // TODO: this assertion is needed only because mls size is fixed to the
+    // number of characters + max number of objects, where each game object
+    // has a fixed movelist index. It may be removed if movelists will be
+    // allocated on demand with an arbitrary index instead.
+    if (!AssertGameContent(err, movelist_count, mls.size(), "Move Lists"))
+        return err;
+    for (size_t i = 0; i < movelist_count; ++i)
+    {
+        err = mls[i].ReadFromFile(in, cmp_ver);
+        if (!err)
+            return err;
+    }
+    return err;
+}
+
 HSaveError WriteManagedPool(Stream *out)
 {
     ccSerializeAllObjects(out);
@@ -1124,10 +1136,11 @@ HSaveError ReadPluginData(Stream *in, int32_t /*cmp_ver*/, const PreservedParams
 
 
 // TODO: move elsewhere later
+// FIXME: currently not passed into the dynamic object deserializer
 enum ManagedPoolSavegameVersion
 {
     kManagedPoolSvgVersion_Initial = 0,
-    kManagedPoolSvgVersion_39999   = 10
+    kManagedPoolSvgVersion_400     = 4000000 // typeinfo for dynamic objects
 };
 
 // Description of a supported game state serialization component
@@ -1143,24 +1156,26 @@ struct ComponentHandler
 // Array of supported components
 ComponentHandler ComponentHandlers[] =
 {
+    // NOTE: the new format values should now be defined as AGS version
+    // at which a change was introduced, represented as NN,NN,NN,NN.
     {
         "Game State",
-        kGSSvgVersion_399,
-        kGSSvgVersion_399,
+        kGSSvgVersion_400,
+        kGSSvgVersion_400,
         WriteGameState,
         ReadGameState
     },
     {
         "Audio",
-        2,
-        0,
+        kAudioSvgVersion_36009,
+        kAudioSvgVersion_Initial,
         WriteAudio,
         ReadAudio
     },
     {
         "Characters",
-        10,
-        10,
+        kCharSvgVersion_400,
+        kCharSvgVersion_400,
         WriteCharacters,
         ReadCharacters
     },
@@ -1173,7 +1188,7 @@ ComponentHandler ComponentHandlers[] =
     },
     {
         "GUI",
-        kGuiSvgVersion_3991,
+        kGuiSvgVersion_400,
         kGuiSvgVersion_Initial,
         WriteGUI,
         ReadGUI
@@ -1187,8 +1202,8 @@ ComponentHandler ComponentHandlers[] =
     },
     {
         "Mouse Cursors",
-        1,
-        0,
+        kCursorSvgVersion_36016,
+        kCursorSvgVersion_Initial,
         WriteMouseCursors,
         ReadMouseCursors
     },
@@ -1208,8 +1223,8 @@ ComponentHandler ComponentHandlers[] =
     },
     {
         "Overlays",
-        10,
-        0,
+        kOverSvgVersion_400,
+        kOverSvgVersion_Initial,
         WriteOverlays,
         ReadOverlays
     },
@@ -1229,29 +1244,36 @@ ComponentHandler ComponentHandlers[] =
     },
     {
         "Room States",
-        kRoomStatSvgVersion_39999,
-        kRoomStatSvgVersion_39999,
+        kRoomStatSvgVersion_400,
+        kRoomStatSvgVersion_400,
         WriteRoomStates,
         ReadRoomStates
     },
     {
         "Loaded Room State",
-        kRoomStatSvgVersion_39999, // must correspond to "Room States"
-        kRoomStatSvgVersion_39999,
+        kRoomStatSvgVersion_400, // must correspond to "Room States"
+        kRoomStatSvgVersion_400,
         WriteThisRoom,
         ReadThisRoom
     },
     {
+        "Move Lists",
+        kMoveSvgVersion_400,
+        kMoveSvgVersion_400,
+        WriteMoveLists,
+        ReadMoveLists
+    },
+    {
         "Managed Pool",
-        kManagedPoolSvgVersion_39999,
+        kManagedPoolSvgVersion_400,
         kManagedPoolSvgVersion_Initial,
         WriteManagedPool,
         ReadManagedPool
     },
     {
         "RTTI",
-        0,
-        0,
+        4000000,
+        4000000,
         WriteRTTI,
         ReadRTTI
     },
@@ -1261,13 +1283,6 @@ ComponentHandler ComponentHandlers[] =
         0,
         WritePluginData,
         ReadPluginData
-    },
-    {
-        "Move Lists",
-        0,
-        0,
-        WriteMoveLists,
-        ReadMoveLists
     },
     { nullptr, 0, 0, nullptr, nullptr } // end of array
 };
