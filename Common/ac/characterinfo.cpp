@@ -19,8 +19,9 @@
 using AGS::Common::Stream;
 
 
-void CharacterInfo::ReadFromFile(Stream *in, GameDataVersion data_ver, int save_ver)
+void CharacterInfo::ReadFromFileImpl(Stream *in, GameDataVersion data_ver, int /*save_ver*/)
 {
+    const bool do_align_pad = data_ver != kGameVersion_Undefined;
     defview = in->ReadInt32();
     talkview = in->ReadInt32();
     view = in->ReadInt32();
@@ -67,10 +68,13 @@ void CharacterInfo::ReadFromFile(Stream *in, GameDataVersion data_ver, int save_
     in->Read(name, 40);
     in->Read(scrname, MAX_SCRIPT_NAME_LEN);
     on = in->ReadInt8();
+    if (do_align_pad)
+        in->ReadInt8(); // alignment padding to int32
 }
 
-void CharacterInfo::WriteToFile(Stream *out) const
+void CharacterInfo::WriteToFileImpl(Stream *out, bool is_save) const
 {
+    const bool do_align_pad = !is_save;
     out->WriteInt32(defview);
     out->WriteInt32(talkview);
     out->WriteInt32(view);
@@ -117,44 +121,26 @@ void CharacterInfo::WriteToFile(Stream *out) const
     out->Write(name, 40);
     out->Write(scrname, MAX_SCRIPT_NAME_LEN);
     out->WriteInt8(on);
+    if (do_align_pad)
+        out->WriteInt8(0); // alignment padding to int32
 }
 
-#if defined (OBSOLETE)
-#include <stdio.h>
-#define COPY_CHAR_VAR(name) ci->name = oci->name
-
-void ConvertOldCharacterToNew (OldCharacterInfo *oci, CharacterInfo *ci) {
-    COPY_CHAR_VAR (defview);
-    COPY_CHAR_VAR (talkview);
-    COPY_CHAR_VAR (view);
-    COPY_CHAR_VAR (room);
-    COPY_CHAR_VAR (prevroom);
-    COPY_CHAR_VAR (x);
-    COPY_CHAR_VAR (y);
-    COPY_CHAR_VAR (wait);
-    COPY_CHAR_VAR (flags);
-    COPY_CHAR_VAR (following);
-    COPY_CHAR_VAR (followinfo);
-    COPY_CHAR_VAR (idleview);
-    COPY_CHAR_VAR (idletime);
-    COPY_CHAR_VAR (idleleft);
-    COPY_CHAR_VAR (transparency);
-    COPY_CHAR_VAR (baseline);
-    COPY_CHAR_VAR (activeinv);
-    COPY_CHAR_VAR (loop);
-    COPY_CHAR_VAR (frame);
-    COPY_CHAR_VAR (walking);
-    COPY_CHAR_VAR (animating);
-    COPY_CHAR_VAR (walkspeed);
-    COPY_CHAR_VAR (animspeed);
-    COPY_CHAR_VAR (actx__);
-    COPY_CHAR_VAR (acty__);
-    COPY_CHAR_VAR (on);
-    snprintf(ci->name, sizeof(CharacterInfo::name), "%s", oci->name);
-    snprintf(ci->scrname, sizeof(CharacterInfo::scrname), "%s", oci->scrname);
-    memcpy (&ci->inv[0], &oci->inv[0], sizeof(short) * 100);
-    // move the talking colour into the struct and remove from flags
-    ci->talkcolor = (oci->flags & OCHF_SPEECHCOL) >> OCHF_SPEECHCOLSHIFT;
-    ci->flags = ci->flags & (~OCHF_SPEECHCOL);
+void CharacterInfo::ReadFromFile(Stream *in, GameDataVersion data_ver)
+{
+    ReadFromFileImpl(in, data_ver, -1);
 }
-#endif // OBSOLETE
+
+void CharacterInfo::WriteToFile(Stream *out) const
+{
+    WriteToFileImpl(out, false);
+}
+
+void CharacterInfo::ReadFromSavegame(Stream *in, int save_ver)
+{
+    ReadFromFileImpl(in, kGameVersion_Undefined, save_ver);
+}
+
+void CharacterInfo::WriteToSavegame(Stream *out) const
+{
+    WriteToFileImpl(out, true);
+}

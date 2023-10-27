@@ -104,13 +104,11 @@ typedef std::shared_ptr<Bitmap> PBitmap;
 // Various room options
 struct RoomOptions
 {
-    // If saving and loading game is disabled in the room
-    bool SaveLoadDisabled;
     // If player character is turned off in the room
     bool PlayerCharOff;
     // Apply player character's normal view when entering this room
     int  PlayerView;
-    // A collection of boolean options
+    // A collection of RoomFlags
     int  Flags;
 
     RoomOptions();
@@ -219,19 +217,6 @@ struct WalkBehind
     WalkBehind();
 };
 
-// Room messages
-
-#define MSG_DISPLAYNEXT 0x01 // supercedes using alt-200 at end of message
-#define MSG_TIMELIMIT   0x02
-
-struct MessageInfo
-{
-    char    DisplayAs; // 0 - std display window, >=1 - as character's speech
-    char    Flags; // combination of MSG_xxx flags
-
-    MessageInfo();
-};
-
 
 // Room's legacy resolution type
 enum RoomResolutionType
@@ -253,13 +238,8 @@ public:
     RoomStruct();
     ~RoomStruct();
 
-    // Gets legacy resolution type
     // Releases room resources
     void            Free();
-    // Release room messages and scripts correspondingly. These two functions are needed
-    // at very specific occasion when only part of the room resources has to be freed.
-    void            FreeMessages();
-    void            FreeScripts();
     // Init default room state
     void            InitDefaults();
 
@@ -327,11 +307,6 @@ public:
     WalkArea                WalkAreas[MAX_WALK_AREAS + 1];
     size_t                  WalkBehindCount;
     WalkBehind              WalkBehinds[MAX_WALK_BEHINDS];
-
-    // Old numbered room messages (used with DisplayMessage, etc)
-    size_t                  MessageCount;
-    String                  Messages[MAX_MESSAGES];
-    MessageInfo             MessageInfos[MAX_MESSAGES];
 
     // Custom properties
     StringIMap              Properties;

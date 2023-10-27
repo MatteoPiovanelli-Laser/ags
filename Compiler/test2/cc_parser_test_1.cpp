@@ -2581,6 +2581,30 @@ TEST_F(Compile1, AssignmentInParameterList1)
     EXPECT_NE(std::string::npos, msg.find("'='"));
 }
 
+TEST_F(Compile1, CallUndefinedFunc) {
+
+    // Function is called, but not defined with body or external
+    // This should be flagged naming the function
+
+    char const *inpl = "\
+        struct Test             \n\
+        {                       \n\
+            static int F();     \n\
+        };                      \n\
+                                \n\
+        int game_start()        \n\
+        {                       \n\
+            Test.F();           \n\
+        }                       \n\
+        ";
+
+    int compileResult = cc_compile(inpl, scrip);
+    std::string msg = last_seen_cc_error();
+    ASSERT_STRNE("Ok", (compileResult >= 0) ? "Ok" : last_seen_cc_error());
+    EXPECT_NE(std::string::npos, msg.find("'Test::F'"));
+    EXPECT_NE(std::string::npos, msg.find("never defined"));
+}
+
 TEST_F(Compile1, CrementAsBinary1) {
 
     // Increment operator can't be used as a binary operator.
@@ -2620,3 +2644,26 @@ TEST_F(Compile1, ReportMissingFunction) {
     EXPECT_NE(std::string::npos, msg.find("pNZaFLjz3ajd"));
 }
 
+TEST_F(Compile1, ParensAfterNew) {
+
+    // Function is called, but not defined with body or external
+    // This should be flagged naming the function
+
+    char const *inpl = "\
+        managed struct Struct       \n\
+        {                           \n\
+            int Payload;            \n\
+        };                          \n\
+                                    \n\
+        int game_start()            \n\
+        {                           \n\
+            Struct *s = new Struct();   \n\
+        }                           \n\
+        ";
+
+
+    AGS::MessageHandler mh;
+    int compileResult = cc_compile(inpl, 0u, scrip, mh);
+    ASSERT_STREQ("Ok", (compileResult >= 0) ? "Ok" : mh.GetError().Message.c_str());
+    ASSERT_EQ(1u, mh.GetMessages().size());
+}

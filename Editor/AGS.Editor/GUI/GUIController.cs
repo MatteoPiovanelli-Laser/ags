@@ -818,7 +818,6 @@ namespace AGS.Editor
                 PropertyTabInteractions.UpdateEventName = new PropertyTabInteractions.UpdateEventNameHandler(PropertyTabInteractions_UpdateEventName);
                 ScriptFunctionUIEditor.OpenScriptEditor = new ScriptFunctionUIEditor.OpenScriptEditorHandler(ScriptFunctionUIEditor_OpenScriptEditor);
                 ScriptFunctionUIEditor.CreateScriptFunction = new ScriptFunctionUIEditor.CreateScriptFunctionHandler(ScriptFunctionUIEditor_CreateScriptFunction);
-                RoomMessagesUIEditor.ShowRoomMessagesEditor = new RoomMessagesUIEditor.RoomMessagesEditorType(ShowRoomMessageEditorFromPropertyGrid);
                 CustomResolutionUIEditor.CustomResolutionSetGUI = new CustomResolutionUIEditor.CustomResolutionGUIType(ShowCustomResolutionChooserFromPropertyGrid);
                 ColorUIEditor.ColorGUI = new ColorUIEditor.ColorGUIType(ShowColorDialog);
                 AudioClipSourceFileUIEditor.AudioClipSourceFileGUI = new AudioClipSourceFileUIEditor.AudioClipSourceFileGUIType(ShowAudioClipSourceFileChooserFromPropertyGrid);
@@ -1287,18 +1286,11 @@ namespace AGS.Editor
                 OnGetScript(scriptToRetrieve, ref script);
                 if (script != null)
                 {
-                    string functionStart = "function " + functionName + "(";
-                    if (script.Text.IndexOf(functionStart) < 0)
+                    if (_agsEditor.AttemptToGetWriteAccess(script.FileName))
                     {
-                        if (_agsEditor.AttemptToGetWriteAccess(script.FileName))
-                        {
-                            script.Text += Environment.NewLine + functionStart + parameters + ")" + Environment.NewLine;
-                            script.Text += "{" + Environment.NewLine + Environment.NewLine + "}" + Environment.NewLine;
-                            if (OnScriptChanged != null)
-                            {
-                                OnScriptChanged(script);
-                            }
-                        }
+                        script.Text = ScriptGeneration.InsertFunction(script.Text, functionName, parameters);
+                        if (script.Modified)
+                            OnScriptChanged?.Invoke(script);
                     }
                 }
             }
@@ -1385,11 +1377,6 @@ namespace AGS.Editor
             }
 
             Factory.GUIController.CustomPropertiesEditor(props, propertyTypes);
-        }
-
-        private void ShowRoomMessageEditorFromPropertyGrid(List<RoomMessage> messages)
-        {
-            RoomMessagesEditor.ShowEditor(messages);
         }
 
         private AudioClip ShowAudioClipSourceFileChooserFromPropertyGrid(AudioClip audioClip)

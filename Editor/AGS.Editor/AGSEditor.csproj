@@ -214,6 +214,7 @@
     <Compile Include="GUI\SpriteChooser.Designer.cs">
       <DependentUpon>SpriteChooser.cs</DependentUpon>
     </Compile>
+    <Compile Include="GUI\TreeViewExtensions.cs" />
     <Compile Include="GUI\ViewChooser.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -387,6 +388,7 @@
     <Compile Include="Utils\DirectoryInfoExtensions.cs" />
     <Compile Include="Utils\FileWatcher.cs" />
     <Compile Include="Utils\MathExtra.cs" />
+    <Compile Include="Utils\ScriptGeneration.cs" />
     <Compile Include="Utils\Validation.cs" />
     <EmbeddedResource Include="GUI\frmMain.resx">
       <SubType>Designer</SubType>
@@ -730,10 +732,6 @@
     <EmbeddedResource Include="GUI\ImportGameWizardPage.resx">
       <SubType>Designer</SubType>
       <DependentUpon>ImportGameWizardPage.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="GUI\RoomMessagesEditor.resx">
-      <SubType>Designer</SubType>
-      <DependentUpon>RoomMessagesEditor.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="GUI\StartNewGameWizardPage.resx">
       <SubType>Designer</SubType>
@@ -1135,12 +1133,6 @@
     </Compile>
     <Compile Include="GUI\ImportGameWizardPage.Designer.cs">
       <DependentUpon>ImportGameWizardPage.cs</DependentUpon>
-    </Compile>
-    <Compile Include="GUI\RoomMessagesEditor.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="GUI\RoomMessagesEditor.Designer.cs">
-      <DependentUpon>RoomMessagesEditor.cs</DependentUpon>
     </Compile>
     <Compile Include="GUI\StartNewGameWizardPage.cs">
       <SubType>UserControl</SubType>

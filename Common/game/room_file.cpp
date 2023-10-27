@@ -75,7 +75,6 @@ void WriteRoomObject(const RoomObjectInfo &obj, Stream *out)
 // Main room data
 HError ReadMainBlock(RoomStruct *room, Stream *in, RoomFileVersion data_ver)
 {
-
     room->BackgroundBPP = in->ReadInt32();
     if (room->BackgroundBPP < 1)
         room->BackgroundBPP = 1;
@@ -185,28 +184,19 @@ HError ReadMainBlock(RoomStruct *room, Stream *in, RoomFileVersion data_ver)
 
     in->Seek(LEGACY_ROOM_PASSWORD_LENGTH); // skip password
     in->ReadInt8();// [DEPRECATED]
-    room->Options.SaveLoadDisabled = in->ReadInt8() != 0;
+    in->ReadInt8();// [DEPRECATED]
     room->Options.PlayerCharOff = in->ReadInt8() != 0;
     room->Options.PlayerView = in->ReadInt8();
     in->ReadInt8();// [DEPRECATED]
     room->Options.Flags = in->ReadInt8();
     in->Seek(ROOM_OPTIONS_RESERVED);
     
-    room->MessageCount = in->ReadInt16();
+    // 2.* format legacy room messages
+    uint16_t legacy_msg_count = in->ReadInt16();
+    if (legacy_msg_count > 0)
+        return new RoomFileError(kRoomFileErr_IncompatibleEngine, "Legacy room messages are no longer supported.");
+
     room->GameID = in->ReadInt32();
-
-    for (size_t i = 0; i < room->MessageCount; ++i)
-    {
-        room->MessageInfos[i].DisplayAs = in->ReadInt8();
-        room->MessageInfos[i].Flags = in->ReadInt8();
-    }
-
-    char buffer[3000];
-    for (size_t i = 0; i < room->MessageCount; ++i)
-    {
-        read_string_decrypt(in, buffer, sizeof(buffer));
-        room->Messages[i] = buffer;
-    }
 
     // Very old format legacy room animations (FullAnimation)
     size_t fullanim_count = in->ReadInt16();
@@ -540,22 +530,14 @@ void WriteMainBlock(const RoomStruct *room, Stream *out)
 
     out->WriteByteCount(0, LEGACY_ROOM_PASSWORD_LENGTH);
     out->WriteInt8(0);// [DEPRECATED]
-    out->WriteInt8(room->Options.SaveLoadDisabled ? 1 : 0);
+    out->WriteInt8(0);// [DEPRECATED]
     out->WriteInt8(room->Options.PlayerCharOff ? 1 : 0);
     out->WriteInt8(room->Options.PlayerView);
     out->WriteInt8(0);// [DEPRECATED]
     out->WriteInt8(room->Options.Flags);
     out->WriteByteCount(0, ROOM_OPTIONS_RESERVED);
-    out->WriteInt16((int16_t)room->MessageCount);
+    out->WriteInt16(0);// [DEPRECATED]
     out->WriteInt32(room->GameID);
-
-    for (size_t i = 0; i < room->MessageCount; ++i)
-    {
-        out->WriteInt8(room->MessageInfos[i].DisplayAs);
-        out->WriteInt8(room->MessageInfos[i].Flags);
-    }
-    for (size_t i = 0; i < room->MessageCount; ++i)
-        write_string_encrypt(out, room->Messages[i].GetCStr());
 
     out->WriteInt16(0); // legacy room animations
 

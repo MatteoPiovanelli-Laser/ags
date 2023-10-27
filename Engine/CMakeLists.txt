@@ -185,8 +185,6 @@ target_sources(engine
     ac/guiinv.cpp
     ac/hotspot.cpp
     ac/hotspot.h
-    ac/interfacebutton.cpp
-    ac/interfaceelement.cpp
     ac/inventoryitem.cpp
     ac/inventoryitem.h
     ac/invwindow.cpp
@@ -324,7 +322,6 @@ target_sources(engine
     gui/guidialog.cpp
     gui/guidialog.h
     gui/guidialogdefines.h
-    gui/guidialoginternaldefs.h
     gui/mycontrols.h
     gui/mylabel.cpp
     gui/mylabel.h

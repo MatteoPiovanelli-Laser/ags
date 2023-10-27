@@ -117,6 +117,12 @@ void read_string_decrypt(Stream *in, char *buf, size_t buf_sz) {
   buf[slen] = 0;
 }
 
+void skip_string_decrypt(Stream *in)
+{
+    size_t len = in->ReadInt32();
+    in->Seek(len);
+}
+
 void read_dictionary (WordsDictionary *dict, Stream *out) {
   int ii;
 
@@ -126,15 +132,6 @@ void read_dictionary (WordsDictionary *dict, Stream *out) {
     dict->wordnum[ii] = out->ReadInt16();
   }
 }
-
-#if defined (OBSOLETE)
-// TODO: not a part of wordsdictionary, move to obsoletes
-void freadmissout(short *pptr, Stream *in) {
-  in->ReadArrayOfInt16(&pptr[0], 5);
-  in->ReadArrayOfInt16(&pptr[7], NUM_CONDIT - 7);
-  pptr[5] = pptr[6] = 0;
-}
-#endif
 
 void encrypt_text(char *toenc) {
   int adx = 0, tobreak = 0;

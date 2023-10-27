@@ -55,10 +55,6 @@ GameSetupStructBase::~GameSetupStructBase()
 
 void GameSetupStructBase::Free()
 {
-    for (int i = 0; i < MAXGLOBALMES; ++i)
-    {
-        messages[i].Free();
-    }
     dict.reset();
     chars.clear();
 
@@ -78,7 +74,11 @@ void GameSetupStructBase::OnResolutionSet()
 
 void GameSetupStructBase::ReadFromFile(Stream *in, GameDataVersion game_ver, SerializeInfo &info)
 {
+    // NOTE: historically the struct was saved by dumping whole memory
+    // into the file stream, which added padding from memory alignment;
+    // here we mark the padding bytes, as they do not belong to actual data.
     in->Read(&gamename[0], GAME_NAME_LENGTH);
+    in->ReadInt16(); // alignment padding to int32 (gamename: 50 -> 52 bytes)
     in->ReadArrayOfInt32(options, MAX_OPTIONS);
     in->Read(&paluses[0], sizeof(paluses));
     // colors are an array of chars
@@ -88,6 +88,7 @@ void GameSetupStructBase::ReadFromFile(Stream *in, GameDataVersion game_ver, Ser
     playercharacter = in->ReadInt32();
     totalscore = in->ReadInt32();
     numinvitems = in->ReadInt16();
+    in->ReadInt16(); // alignment padding to int32
     numdialog = in->ReadInt32();
     numdlgmessage = in->ReadInt32();
     numfonts = in->ReadInt32();
@@ -109,7 +110,7 @@ void GameSetupStructBase::ReadFromFile(Stream *in, GameDataVersion game_ver, Ser
     default_lipsync_frame = in->ReadInt32();
     invhotdotsprite = in->ReadInt32();
     in->ReadArrayOfInt32(reserved, NUM_INTS_RESERVED);
-    in->ReadArrayOfInt32(&info.HasMessages.front(), MAXGLOBALMES);
+    in->ReadArrayOfInt32(&info.HasMessages.front(), NUM_LEGACY_GLOBALMES);
 
     info.HasWordsDict = in->ReadInt32() != 0;
     in->ReadInt32(); // globalscript (dummy 32-bit pointer value)
@@ -119,7 +120,11 @@ void GameSetupStructBase::ReadFromFile(Stream *in, GameDataVersion game_ver, Ser
 
 void GameSetupStructBase::WriteToFile(Stream *out, const SerializeInfo &info) const
 {
+    // NOTE: historically the struct was saved by dumping whole memory
+    // into the file stream, which added padding from memory alignment;
+    // here we mark the padding bytes, as they do not belong to actual data.
     out->Write(&gamename[0], GAME_NAME_LENGTH);
+    out->WriteInt16(0); // alignment padding to int32
     out->WriteArrayOfInt32(options, MAX_OPTIONS);
     out->Write(&paluses[0], sizeof(paluses));
     // colors are an array of chars
@@ -129,6 +134,7 @@ void GameSetupStructBase::WriteToFile(Stream *out, const SerializeInfo &info) co
     out->WriteInt32(playercharacter);
     out->WriteInt32(totalscore);
     out->WriteInt16(numinvitems);
+    out->WriteInt16(0); // alignment padding to int32
     out->WriteInt32(numdialog);
     out->WriteInt32(numdlgmessage);
     out->WriteInt32(numfonts);
@@ -146,10 +152,7 @@ void GameSetupStructBase::WriteToFile(Stream *out, const SerializeInfo &info) co
     out->WriteInt32(default_lipsync_frame);
     out->WriteInt32(invhotdotsprite);
     out->WriteArrayOfInt32(reserved, NUM_INTS_RESERVED);
-    for (int i = 0; i < MAXGLOBALMES; ++i)
-    {
-        out->WriteInt32(!messages[i].IsEmpty() ? 1 : 0);
-    }
+    out->WriteByteCount(0, sizeof(int32_t) * NUM_LEGACY_GLOBALMES);
     out->WriteInt32(dict ? 1 : 0);
     out->WriteInt32(0); // globalscript (dummy 32-bit pointer value)
     out->WriteInt32(0); // chars  (dummy 32-bit pointer value)

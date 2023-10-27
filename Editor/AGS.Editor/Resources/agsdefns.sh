@@ -654,18 +654,22 @@ builtin managed struct DrawingSurface {
 #endif
   /// Draws a straight line between the two points on the surface.
   import void DrawLine(int x1, int y1, int x2, int y2, int thickness=1);
-  /// Draws a message from the Room Message Editor, wrapping at the specified width.
-  import void DrawMessageWrapped(int x, int y, int width, FontType, int messageNumber);
   /// Changes the colour of a single pixel on the surface.
   import void DrawPixel(int x, int y);
   /// Draws a filled rectangle to the surface.
   import void DrawRectangle(int x1, int y1, int x2, int y2);
   /// Draws the specified text to the surface.
   import void DrawString(int x, int y, FontType, const string text, ...);
+#ifdef SCRIPT_API_v361
+  /// Draws the text to the surface, wrapping it at the specified width.
+  import void DrawStringWrapped(int x, int y, int width, FontType, HorizontalAlignment, const string text, ...);
+#endif
+#ifndef SCRIPT_API_v361
 #ifdef SCRIPT_API_v350
   /// Draws the text to the surface, wrapping it at the specified width.
   import void DrawStringWrapped(int x, int y, int width, FontType, HorizontalAlignment, const string text);
 #endif
+#endif // !SCRIPT_API_v361
   /// Draws a filled triangle onto the surface.
   import void DrawTriangle(int x1, int y1, int x2, int y2, int x3, int y3);
   /// Gets the colour of a single pixel on the surface.
@@ -698,8 +702,6 @@ builtin struct Room {
   readonly import static attribute int Height;
   /// Gets the X co-ordinate of the left edge of the room.
   readonly import static attribute int LeftEdge;
-  /// Accesses room messages, as set up in the Room Message Editor.
-  readonly import static attribute String Messages[];
   /// Gets the number of objects in this room.
   readonly import static attribute int ObjectCount;
   /// Gets the X co-ordinate of the right edge of the room.
@@ -738,16 +740,16 @@ builtin struct Parser {
 import void Display(const string message, ...);
 /// Displays the text in a standard text window at the specified location.
 import void DisplayAt(int x, int y, int width, const string message, ...);
+#ifdef SCRIPT_API_v361
+/// Displays the text in a standard text window at the specified y-coordinate.
+import void DisplayAtY (int y, const string message, ...);
+#endif
+#ifndef SCRIPT_API_v361
 /// Displays the text in a standard text window at the specified y-coordinate.
 import void DisplayAtY (int y, const string message);
-/// Displays a message from the Room Message Editor.
-import void DisplayMessage(int messageNumber);
-/// Displays a message from the Room Message Editor at the specified y-coordinate.
-import void DisplayMessageAtY(int messageNumber, int y);
+#endif
 /// Displays a message in a text window with a title, used for speech in SCI0 games.
 import void DisplayTopBar(int y, int textColor, int backColor, const string title, const string text, ...);
-/// Displays a Room Message Editor message in a text window with a title, used for speech in SCI0 games.
-import void DisplayMessageBar(int y, int textColor, int backColor, const string title, int message);
 /// Resets the room state back to how it was initially set up in the editor.
 import void ResetRoom(int roomNumber);
 /// Checks whether the player has been in the specified room yet.
@@ -2040,10 +2042,22 @@ builtin managed struct Character {
   import function RunInteraction(CursorMode);
   /// Says the specified text using the character's speech settings.
   import function Say(const string message, ...);
+#ifdef SCRIPT_API_v361
+  /// Says the specified text at the specified position on the screen using the character's speech settings.
+  import function SayAt(int x, int y, int width, const string message, ...);
+#endif
+#ifndef SCRIPT_API_v361
   /// Says the specified text at the specified position on the screen using the character's speech settings.
   import function SayAt(int x, int y, int width, const string message);
+#endif
+#ifdef SCRIPT_API_v361
+  /// Displays the text as lucasarts-style speech but does not block the game.
+  import Overlay* SayBackground(const string message, ...);
+#endif
+#ifndef SCRIPT_API_v361
   /// Displays the text as lucasarts-style speech but does not block the game.
   import Overlay* SayBackground(const string message);
+#endif
   /// Makes this character the player character.
   import function SetAsPlayer();
   /// Changes the character's idle view.
@@ -2252,10 +2266,6 @@ builtin struct Game {
   readonly import static attribute String FileName;
   /// Gets the number of fonts in the game.
   readonly import static attribute int FontCount;
-  /// Accesses the legacy Global Messages, from AGS 2.x
-  readonly import static attribute String GlobalMessages[];
-  /// Accesses the global strings collection. This is obsolete.
-  import static attribute String GlobalStrings[];
   /// Gets the number of GUIs in the game.
   readonly import static attribute int GUICount;
   /// Gets/sets the time for which user input is ignored after some text is automatically removed

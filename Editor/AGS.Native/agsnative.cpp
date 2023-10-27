@@ -29,7 +29,6 @@ extern "C" bool Scintilla_RegisterClasses(void *hInstance);
 #include "util/compress.h"
 #include "util/string_types.h"
 #include "util/string_utils.h"    // fputstring, etc
-#include "util/alignedstream.h"
 #include "util/directory.h"
 #include "util/filestream.h"
 #include "util/path.h"
@@ -39,7 +38,6 @@ extern "C" bool Scintilla_RegisterClasses(void *hInstance);
 
 using AGS::Types::AGSEditorException;
 
-using AGS::Common::AlignedStream;
 using AGS::Common::Stream;
 using AGS::Common::AssetLibInfo;
 using AGS::Common::AssetManager;
@@ -1732,6 +1730,33 @@ Common::Bitmap *CreateBlockFromBitmap(System::Drawing::Bitmap ^bmp, RGB *imgpal,
 	if (colDepth == 8)
 	{
 		cli::array<System::Drawing::Color> ^bmpPalette = bmp->Palette->Entries;
+    
+    // determine actual transparency index, in case of GIF or other formats that can mark a specific palette entry
+    int transparency_index = 0;
+    for (int i = 0; i < bmpPalette->Length; ++i) {
+      if (bmpPalette[i].A == 0) {
+        transparency_index = i;
+        System::Drawing::Color toswap = bmpPalette[0];
+        bmpPalette[0] = bmpPalette[i];
+        bmpPalette[i] = toswap;
+        break; // to avoid blank palette entries
+      }
+    }
+    
+    // normalize tranparency to palette entry zero
+    if (transparency_index != 0)
+    {
+      for (int tt = 0; tt<tempsprite->GetWidth(); tt++) {
+        for (int uu = 0; uu<tempsprite->GetHeight(); uu++) {
+          const int pixel = tempsprite->GetPixel(tt, uu);
+          if (pixel == 0)
+            tempsprite->PutPixel(tt, uu, transparency_index);
+          else if (pixel == transparency_index)
+            tempsprite->PutPixel(tt, uu, 0);
+        }
+      }
+    }
+    
 		for (int i = 0; i < 256; i++) {
       if (i >= bmpPalette->Length)
       {
@@ -2478,18 +2503,6 @@ Game^ import_compiled_game_dta(const AGSString &filename)
 		game->TextParser->Words->Add(newWord);
 	}
 
-	for (int i = 0; i < MAXGLOBALMES; i++) 
-	{
-		if (thisgame.messages[i] != NULL) 
-		{
-			game->GlobalMessages[i] = gcnew String(thisgame.messages[i].GetCStr());
-		}
-		else
-		{
-			game->GlobalMessages[i] = String::Empty;
-		}
-	}
-
 	game->LipSync->Type = (thisgame.options[OPT_LIPSYNCTEXT] != 0) ? LipSyncType::Text : LipSyncType::None;
 	game->LipSync->DefaultFrame = thisgame.default_lipsync_frame;
 	for (int i = 0; i < MAXLIPSYNCFRAMES; i++) 
@@ -2778,7 +2791,6 @@ void convert_room_from_native(const RoomStruct &rs, Room ^room, System::Text::En
     room->LeftEdgeX = rs.Edges.Left;
     room->PlayerCharacterView = rs.Options.PlayerView;
     room->RightEdgeX = rs.Edges.Right;
-    room->SaveLoadEnabled = (rs.Options.SaveLoadDisabled == 0);
     room->ShowPlayerCharacter = (rs.Options.PlayerCharOff == 0);
     room->TopEdgeY = rs.Edges.Top;
     room->Width = rs.Width;
@@ -2788,17 +2800,6 @@ void convert_room_from_native(const RoomStruct &rs, Room ^room, System::Text::En
     room->BackgroundAnimationEnabled = (rs.Options.Flags & kRoomFlag_BkgFrameLocked) == 0;
     room->BackgroundCount = rs.BgFrameCount;
     room->MaskResolution = rs.MaskResolution;
-
-    for (size_t i = 0; i < rs.MessageCount; ++i)
-	{
-		RoomMessage ^newMessage = gcnew RoomMessage(i);
-		newMessage->Text = tcv->Convert(rs.Messages[i]);
-		newMessage->ShowAsSpeech = (rs.MessageInfos[i].DisplayAs > 0);
-		newMessage->CharacterID = (rs.MessageInfos[i].DisplayAs - 1);
-		newMessage->DisplayNextMessageAfter = ((rs.MessageInfos[i].Flags & MSG_DISPLAYNEXT) != 0);
-		newMessage->AutoRemoveAfterTime = ((rs.MessageInfos[i].Flags & MSG_TIMELIMIT) != 0);
-		room->Messages->Add(newMessage);
-	}
 
 	for (size_t i = 0; i < rs.Objects.size(); ++i) 
 	{
@@ -2903,7 +2904,6 @@ void convert_room_to_native(Room ^room, RoomStruct &rs)
 	rs.Edges.Left = room->LeftEdgeX;
 	rs.Options.PlayerView = room->PlayerCharacterView;
 	rs.Edges.Right = room->RightEdgeX;
-	rs.Options.SaveLoadDisabled = room->SaveLoadEnabled ? 0 : 1;
 	rs.Options.PlayerCharOff = room->ShowPlayerCharacter ? 0 : 1;
 	rs.Edges.Top = room->TopEdgeY;
 	rs.Width = room->Width;
@@ -2913,24 +2913,6 @@ void convert_room_to_native(Room ^room, RoomStruct &rs)
     rs.Options.Flags = 0;
     if (!room->BackgroundAnimationEnabled)
         rs.Options.Flags |= kRoomFlag_BkgFrameLocked;
-
-	rs.MessageCount = room->Messages->Count;
-	for (size_t i = 0; i < rs.MessageCount; ++i)
-	{
-		RoomMessage ^newMessage = room->Messages[i];
-		rs.Messages[i] = tcv->ConvertTextProperty(newMessage->Text);
-		if (newMessage->ShowAsSpeech)
-		{
-			rs.MessageInfos[i].DisplayAs = newMessage->CharacterID + 1;
-		}
-		else
-		{
-			rs.MessageInfos[i].DisplayAs = 0;
-		}
-		rs.MessageInfos[i].Flags = 0;
-		if (newMessage->DisplayNextMessageAfter) rs.MessageInfos[i].Flags |= MSG_DISPLAYNEXT;
-		if (newMessage->AutoRemoveAfterTime) rs.MessageInfos[i].Flags |= MSG_TIMELIMIT;
-	}
 
 	rs.Objects.resize(room->Objects->Count);
 	for (size_t i = 0; i < rs.Objects.size(); ++i)

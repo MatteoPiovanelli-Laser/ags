@@ -185,16 +185,6 @@ bool Room_SetTextProperty(const char *property, const char *value)
     return set_text_property(croom->roomProps, property, value);
 }
 
-const char* Room_GetMessages(int index) {
-    if ((index < 0) || ((size_t)index >= thisroom.MessageCount)) {
-        return nullptr;
-    }
-    char buffer[STD_BUFFER_SIZE];
-    buffer[0]=0;
-    replace_tokens(get_translation(thisroom.Messages[index].GetCStr()), buffer, STD_BUFFER_SIZE);
-    return CreateNewScriptString(buffer);
-}
-
 bool Room_Exists(int room)
 {
     String room_filename;
@@ -506,16 +496,6 @@ void load_new_room(int newnum, CharacterInfo*forchar) {
         for (int cc = 0; cc < MAX_ROOM_REGIONS; cc++) {
             croom->region_enabled[cc] = 1;
         }
-
-#if defined (OBSOLETE)
-        for (cc = 0; cc<MAX_LEGACY_ROOM_FLAGS; cc++) croom->flagstates[cc] = 0;
-        // we copy these structs for the Score column to work
-        croom->misccond = thisroom.misccond;
-        for (cc = 0; cc<MAX_ROOM_HOTSPOTS; cc++)
-            croom->hscond[cc] = thisroom.hscond[cc];
-        for (cc = 0; cc<MAX_ROOM_OBJECTS; cc++)
-            croom->objcond[cc] = thisroom.objcond[cc];
-#endif
 
         croom->beenhere=1;
         in_new_room=2;
@@ -993,12 +973,6 @@ RuntimeScriptValue Sc_Room_GetLeftEdge(const RuntimeScriptValue *params, int32_t
     API_SCALL_INT(Room_GetLeftEdge);
 }
 
-// const char* (int index)
-RuntimeScriptValue Sc_Room_GetMessages(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_OBJ_PINT(const char, myScriptStringImpl, Room_GetMessages);
-}
-
 // int ()
 RuntimeScriptValue Sc_Room_GetObjectCount(const RuntimeScriptValue *params, int32_t param_count)
 {
@@ -1048,7 +1022,6 @@ void RegisterRoomAPI()
         { "Room::get_ColorDepth",                     API_FN_PAIR(Room_GetColorDepth) },
         { "Room::get_Height",                         API_FN_PAIR(Room_GetHeight) },
         { "Room::get_LeftEdge",                       API_FN_PAIR(Room_GetLeftEdge) },
-        { "Room::geti_Messages",                      API_FN_PAIR(Room_GetMessages) },
         { "Room::get_ObjectCount",                    API_FN_PAIR(Room_GetObjectCount) },
         { "Room::get_RightEdge",                      API_FN_PAIR(Room_GetRightEdge) },
         { "Room::get_TopEdge",                        API_FN_PAIR(Room_GetTopEdge) },

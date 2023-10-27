@@ -38,8 +38,8 @@ struct HotspotState
 enum RoomStatSvgVersion
 {
     kRoomStatSvgVersion_Initial  = 0,
-    kRoomStatSvgVersion_36016    = 1, // hotspot and object names
-    // 2 was practically unused
+    kRoomStatSvgVersion_350      = 1, // new movelist format (along with pathfinder)
+    kRoomStatSvgVersion_36016    = 2, // hotspot and object names
     kRoomStatSvgVersion_36025    = 3, // object animation volume
     kRoomStatSvgVersion_36041    = 4, // room state's contentFormat
     kRoomStatSvgVersion_36109    = 5, // removed movelists, save externally
@@ -62,14 +62,6 @@ struct RoomStatus
     HotspotState hotspot[MAX_ROOM_HOTSPOTS];
     char  region_enabled[MAX_ROOM_REGIONS];
     short walkbehind_base[MAX_WALK_BEHINDS];
-
-    // Likely pre-2.5 data
-#if defined (OBSOLETE)
-    short flagstates[MAX_LEGACY_ROOM_FLAGS]{};
-    EventBlock hscond[MAX_ROOM_HOTSPOTS];
-    EventBlock objcond[MAX_ROOM_OBJECTS];
-    EventBlock misccond;
-#endif
 
     // A version of a save this RoomStatus was restored from.
     // This is used as a hint when merging RoomStatus with the loaded room file (upon room enter).

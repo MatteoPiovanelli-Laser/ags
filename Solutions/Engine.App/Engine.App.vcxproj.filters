@@ -294,12 +294,6 @@
     <ClCompile Include="..\..\Engine\ac\hotspot.cpp">
       <Filter>Source Files\ac</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Engine\ac\interfacebutton.cpp">
-      <Filter>Source Files\ac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Engine\ac\interfaceelement.cpp">
-      <Filter>Source Files\ac</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Engine\ac\inventoryitem.cpp">
       <Filter>Source Files\ac</Filter>
     </ClCompile>
@@ -1275,9 +1269,6 @@
       <Filter>Header Files\gui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Engine\gui\guidialogdefines.h">
-      <Filter>Header Files\gui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Engine\gui\guidialoginternaldefs.h">
       <Filter>Header Files\gui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Engine\gui\mycontrols.h">

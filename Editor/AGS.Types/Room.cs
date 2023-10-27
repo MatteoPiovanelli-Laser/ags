@@ -36,7 +36,6 @@ namespace AGS.Types
         private int _rightEdgeX;
         private int _topEdgeY;
         private int _bottomEdgeY;
-        private bool _saveLoadEnabled = true;
         private bool _showPlayerCharacter = true;
         private int _playerCharacterView;
         private int _maskResolution = 1;
@@ -50,7 +49,6 @@ namespace AGS.Types
         private bool _modified;
         private CustomProperties _properties = new CustomProperties();
         private Interactions _interactions = new Interactions(_interactionSchema);
-        private readonly List<RoomMessage> _messages = new List<RoomMessage>();
         private readonly List<RoomObject> _objects = new List<RoomObject>();
         private readonly List<RoomHotspot> _hotspots = new List<RoomHotspot>();
         private readonly List<RoomWalkableArea> _walkableAreas = new List<RoomWalkableArea>();
@@ -113,7 +111,6 @@ namespace AGS.Types
         public Room(XmlNode node) : base(node)
         {
             _interactions.FromXml(node);
-            _messages.AddRange(GetXmlChildren(node, "/Room/Messages", int.MaxValue).Select((xml, i) => new RoomMessage(i, xml)));
             _objects.AddRange(GetXmlChildren(node, "/Room/Objects", MAX_OBJECTS).Select((xml, i) => new RoomObject(this, xml) { ID = i }));
             _hotspots.AddRange(GetXmlChildren(node, "/Room/Hotspots", MAX_HOTSPOTS).Select((xml, i) => new RoomHotspot(this, xml) { ID = i }));
             _walkableAreas.AddRange(GetXmlChildren(node, "/Room/WalkableAreas", MAX_WALKABLE_AREAS).Select((xml, i) => new RoomWalkableArea(xml) { ID = i }));
@@ -191,32 +188,10 @@ namespace AGS.Types
             get { return _height; }
             set { _height = value; }
         }
-        /*
-        [Description("Width of the background image, in real pixels")]
-        [DisplayName("ImageWidth")]
-        [Category("Visual")]
-        [ReadOnly(true)]
-        public int ImageWidth
-        {
-            get { return _width * (int)_resolution; }
-        }
 
-        [Description("Height of the background image, in real pixels")]
-        [DisplayName("ImageHeight")]
-        [Category("Visual")]
-        [ReadOnly(true)]
-        public int ImageHeight
-        {
-            get { return _height * (int)_resolution; }
-        }*/
-
-        [Description("Room-specific messages")]
-        [Category("Messages")]
-        [EditorAttribute(typeof(RoomMessagesUIEditor), typeof(System.Drawing.Design.UITypeEditor))]
-        public IList<RoomMessage> Messages
-        {
-            get { return _messages; }
-        }
+        [Obsolete]
+        [Browsable(false)]
+        public object Messages { get; }
 
         [Browsable(false)]
         public IList<RoomObject> Objects
@@ -314,12 +289,10 @@ namespace AGS.Types
         [Browsable(false)]
         public int PlayMusicOnRoomLoad { get; }
 
+        [Obsolete]
         [Browsable(false)]
-        public bool SaveLoadEnabled
-        {
-            get { return _saveLoadEnabled; }
-            set { _saveLoadEnabled = value; }
-        }
+        // TODO: check if it's okay to adjust ILoadedRoom interface and let remove the setter here
+        public bool SaveLoadEnabled { get; set; }
 
         [Description("Whether the player character is visible on this screen")]
         [DefaultValue(true)]
@@ -451,7 +424,6 @@ namespace AGS.Types
             writer.WriteAttributeString("Version", LATEST_XML_VERSION);
             SerializeUtils.SerializePropertiesToXML(this, writer);
             Interactions.ToXml(writer);
-            SerializeUtils.SerializeToXML(writer, "Messages", Messages);
             SerializeUtils.SerializeToXML(writer, "Objects", Objects);
             SerializeUtils.SerializeToXML(writer, "Hotspots", Hotspots);
             SerializeUtils.SerializeToXML(writer, "WalkableAreas", WalkableAreas);

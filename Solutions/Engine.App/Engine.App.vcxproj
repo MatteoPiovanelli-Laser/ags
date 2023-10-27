@@ -528,8 +528,6 @@
     <ClCompile Include="..\..\Engine\ac\guicontrol.cpp" />
     <ClCompile Include="..\..\Engine\ac\guiinv.cpp" />
     <ClCompile Include="..\..\Engine\ac\hotspot.cpp" />
-    <ClCompile Include="..\..\Engine\ac\interfacebutton.cpp" />
-    <ClCompile Include="..\..\Engine\ac\interfaceelement.cpp" />
     <ClCompile Include="..\..\Engine\ac\inventoryitem.cpp" />
     <ClCompile Include="..\..\Engine\ac\invwindow.cpp" />
     <ClCompile Include="..\..\Engine\ac\label.cpp" />
@@ -845,7 +843,6 @@
     <ClInclude Include="..\..\Engine\gui\gui.h" />
     <ClInclude Include="..\..\Engine\gui\guidialog.h" />
     <ClInclude Include="..\..\Engine\gui\guidialogdefines.h" />
-    <ClInclude Include="..\..\Engine\gui\guidialoginternaldefs.h" />
     <ClInclude Include="..\..\Engine\gui\mycontrols.h" />
     <ClInclude Include="..\..\Engine\gui\mylabel.h" />
     <ClInclude Include="..\..\Engine\gui\mylistbox.h" />

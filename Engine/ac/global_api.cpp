@@ -156,25 +156,9 @@ RuntimeScriptValue Sc_DisplayAt(const RuntimeScriptValue *params, int32_t param_
 // void  (int ypos, char *texx)
 RuntimeScriptValue Sc_DisplayAtY(const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_SCALL_VOID_PINT_POBJ(DisplayAtY, const char);
-}
-
-// void (int msnum)
-RuntimeScriptValue Sc_DisplayMessage(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_VOID_PINT(DisplayMessage);
-}
-
-// void (int msnum, int ypos)
-RuntimeScriptValue Sc_DisplayMessageAtY(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_VOID_PINT2(DisplayMessageAtY);
-}
-
-// void (int ypos, int ttexcol, int backcol, char *title, int msgnum)
-RuntimeScriptValue Sc_DisplayMessageBar(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_VOID_PINT3_POBJ_PINT(DisplayMessageBar, const char);
+    API_SCALL_SCRIPT_SPRINTF(DisplayAtY, 2);
+    DisplayAtY(params[0].IValue, scsf_buffer);
+    return RuntimeScriptValue((int32_t)0);
 }
 
 // void (int ypos, int ttexcol, int backcol, char *title, char*texx, ...)
@@ -349,12 +333,6 @@ RuntimeScriptValue Sc_GetGameOption(const RuntimeScriptValue *params, int32_t pa
 RuntimeScriptValue Sc_GetGameSpeed(const RuntimeScriptValue *params, int32_t param_count)
 {
     API_SCALL_INT(GetGameSpeed);
-}
-
-// int (int index)
-RuntimeScriptValue Sc_GetGlobalInt(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_INT_PINT(GetGlobalInt);
 }
 
 // int (int xxx,int yyy)
@@ -1170,18 +1148,22 @@ void ScPl_sc_AbortGame(const char *texx, ...)
     _sc_AbortGame(scsf_buffer);
 }
 
-// void (char*texx, ...)
 void ScPl_Display(char *texx, ...)
 {
     API_PLUGIN_SCRIPT_SPRINTF(texx);
     DisplaySimple(scsf_buffer);
 }
 
-// void (int xxp,int yyp,int widd,char*texx, ...)
 void ScPl_DisplayAt(int xxp, int yyp, int widd, char *texx, ...)
 {
     API_PLUGIN_SCRIPT_SPRINTF(texx);
     DisplayAt(xxp, yyp, widd, scsf_buffer);
+}
+
+void ScPl_DisplayAtY(int ypos, char *texx, ...)
+{
+    API_PLUGIN_SCRIPT_SPRINTF(texx);
+    DisplayAtY(ypos, scsf_buffer);
 }
 
 // void (int ypos, int ttexcol, int backcol, char *title, char*texx, ...)
@@ -1212,10 +1194,10 @@ void RegisterGlobalAPI()
         { "DisableRegion",            API_FN_PAIR(DisableRegion) },
         { "Display",                  Sc_Display, ScPl_Display },
         { "DisplayAt",                Sc_DisplayAt, ScPl_DisplayAt },
-        { "DisplayAtY",               API_FN_PAIR(DisplayAtY) },
-        { "DisplayMessage",           API_FN_PAIR(DisplayMessage) },
-        { "DisplayMessageAtY",        API_FN_PAIR(DisplayMessageAtY) },
-        { "DisplayMessageBar",        API_FN_PAIR(DisplayMessageBar) },
+        // CHECKME: this function was non-variadic prior to 3.6.1, but AGS compiler does
+        // not produce "name^argnum" symbol id for non-member functions for some reason :/
+        // do we have to do anything about this here? like, test vs script API version...
+        { "DisplayAtY",               Sc_DisplayAtY, ScPl_DisplayAtY },
         { "DisplayTopBar",            Sc_DisplayTopBar, ScPl_DisplayTopBar },
         { "EnableCursorMode",         API_FN_PAIR(enable_cursor_mode) },
         { "EnableGroundLevelAreas",   API_FN_PAIR(EnableGroundLevelAreas) },
@@ -1247,7 +1229,6 @@ void RegisterGlobalAPI()
         { "GetDialogOption",          API_FN_PAIR(GetDialogOption) },
         { "GetGameOption",            API_FN_PAIR(GetGameOption) },
         { "GetGameSpeed",             API_FN_PAIR(GetGameSpeed) },
-        { "GetGlobalInt",             API_FN_PAIR(GetGlobalInt) },
         { "GetHotspotAt",             API_FN_PAIR(GetHotspotIDAtScreen) },
         { "GetHotspotName",           API_FN_PAIR(GetHotspotName) },
         { "GetHotspotPointX",         API_FN_PAIR(GetHotspotPointX) },

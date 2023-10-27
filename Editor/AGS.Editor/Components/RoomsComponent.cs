@@ -451,10 +451,10 @@ namespace AGS.Editor.Components
 
                 UnloadedRoom newRoom = new UnloadedRoom(newRoomNumber);
                 Task.WaitAll(ConvertRoomFromCrmToOpenFormat(newRoom, null).ToArray());
-                AddSingleItem(newRoom);                
+                var nodeId = AddSingleItem(newRoom);
 				_agsEditor.CurrentGame.FilesAddedOrRemoved = true;
 
-                RePopulateTreeView();
+                RePopulateTreeView(nodeId);
                 RoomListTypeConverter.SetRoomList(_agsEditor.CurrentGame.Rooms);
                 _guiController.ShowMessage("Room file imported successfully as room " + newRoomNumber + ".", MessageBoxIcon.Information);
             }
@@ -912,7 +912,7 @@ namespace AGS.Editor.Components
             // TODO: group these in some UpdateRoomToNewVersion method
             _loadedRoom.Modified |= ImportExport.CreateInteractionScripts(_loadedRoom, errors);
             _loadedRoom.Modified |= HookUpInteractionVariables(_loadedRoom);
-            _loadedRoom.Modified |= AddPlayMusicCommandToPlayerEntersRoomScript(_loadedRoom, errors);
+            _loadedRoom.Modified |= HandleObsoleteSettings(_loadedRoom, errors);
 			if (_loadedRoom.Script.Modified)
 			{
 				if (_roomScriptEditors.ContainsKey(_loadedRoom.Number))
@@ -923,47 +923,13 @@ namespace AGS.Editor.Components
             return _loadedRoom;
         }
 
-        private bool AddPlayMusicCommandToPlayerEntersRoomScript(Room room, CompileMessages errors)
+        private bool HandleObsoleteSettings(Room room, CompileMessages errors)
         {
+#pragma warning disable 0612
             bool scriptModified = false;
-
-            if (room.PlayMusicOnRoomLoad > 0)
-            {
-                AudioClip clip = _agsEditor.CurrentGame.FindAudioClipForOldMusicNumber(null, room.PlayMusicOnRoomLoad);
-                if (clip == null)
-                {
-                    errors.Add(new CompileWarning("Room " + room.Number + ": Unable to find aMusic" + room.PlayMusicOnRoomLoad + " which was set as this room's start music"));
-                    return scriptModified;
-                }
-
-                string scriptName = room.Interactions.GetScriptFunctionNameForInteractionSuffix(Room.EVENT_SUFFIX_ROOM_LOAD);
-                if (string.IsNullOrEmpty(scriptName))
-                {
-                    scriptName = "Room_" + Room.EVENT_SUFFIX_ROOM_LOAD;
-                    room.Interactions.SetScriptFunctionNameForInteractionSuffix(Room.EVENT_SUFFIX_ROOM_LOAD, scriptName);
-                    room.Script.Text += Environment.NewLine + "function " + scriptName + "()" +
-                        Environment.NewLine + "{" + Environment.NewLine +
-                        "}" + Environment.NewLine;
-                    scriptModified = true;
-                }
-                int functionOffset = room.Script.Text.IndexOf(scriptName);
-                if (functionOffset < 0)
-                {
-                    errors.Add(new CompileWarning("Room " + room.Number + ": Unable to find definition for " + scriptName + " to add Room Load music " + room.PlayMusicOnRoomLoad));
-                }
-                else
-                {
-                    functionOffset = room.Script.Text.IndexOf('{', functionOffset);
-                    functionOffset = room.Script.Text.IndexOf('\n', functionOffset) + 1;
-                    string newScript = room.Script.Text.Substring(0, functionOffset);
-                    newScript += "  " + clip.ScriptName + ".Play();" + Environment.NewLine;
-                    newScript += room.Script.Text.Substring(functionOffset);
-                    room.Script.Text = newScript;
-                    scriptModified = true;
-                }
-            }
-
+            // Add operations here as necessary
             return scriptModified;
+#pragma warning restore 0612
         }
 
         private bool ApplyDefaultMaskResolution(Room room)
@@ -1155,7 +1121,7 @@ namespace AGS.Editor.Components
             {
                 UnloadedRoom room = FindRoomByID(_loadedRoom.Number);
                 room.Description = _loadedRoom.Description;
-                RePopulateTreeView();
+                RePopulateTreeView(GetItemNodeID(room));
                 RoomListTypeConverter.RefreshRoomList();
             }
 
@@ -1237,7 +1203,7 @@ namespace AGS.Editor.Components
                 _roomSettings.TreeNodeID = TREE_PREFIX_ROOM_SETTINGS + numberRequested;
 				_guiController.AddOrShowPane(_roomSettings);
 				_agsEditor.CurrentGame.FilesAddedOrRemoved = true;
-				RePopulateTreeView();
+				RePopulateTreeView(GetItemNodeID(oldRoom));
 			}
 		}
 
@@ -1563,16 +1529,6 @@ namespace AGS.Editor.Components
                 if (processor.MakesChanges)
                 {
                     room.Script.SaveToDisk();
-                }
-
-                foreach (RoomMessage message in room.Messages)
-                {
-                    int charId = message.CharacterID;
-                    if (!message.ShowAsSpeech)
-                    {
-                        charId = Character.NARRATOR_CHARACTER_ID;
-                    }
-                    message.Text = processor.ProcessText(message.Text, GameTextType.Message, charId);
                 }
 
                 TextProcessingHelper.ProcessProperties(processor, _agsEditor.CurrentGame.PropertySchema, room.Properties, errors);
@@ -1925,6 +1881,11 @@ namespace AGS.Editor.Components
         protected override IList<IRoom> GetFlatList()
         {
             return null;
+        }
+
+        private string GetItemNodeID(UnloadedRoom room)
+        {
+            return TREE_PREFIX_ROOM_NODE + room.Number;
         }
 
         private void LoadImageCache()

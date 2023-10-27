@@ -316,17 +316,6 @@ void DrawingSurface_DrawStringWrapped(ScriptDrawingSurface *sds, int xx, int yy,
     sds->FinishedDrawing();
 }
 
-void DrawingSurface_DrawMessageWrapped(ScriptDrawingSurface *sds, int xx, int yy, int wid, int font, int msgm)
-{
-    char displbuf[3000];
-    get_message_text(msgm, displbuf);
-    // it's probably too late but check anyway
-    if (strlen(displbuf) > 2899)
-        quit("!RawPrintMessageWrapped: message too long");
-
-    DrawingSurface_DrawStringWrapped_Old(sds, xx, yy, wid, font, kLegacyScAlignLeft, displbuf);
-}
-
 void DrawingSurface_DrawLine(ScriptDrawingSurface *sds, int fromx, int fromy, int tox, int toy, int thickness) {
     int ii,jj,xx,yy;
     Bitmap *ds = sds->StartDrawing();
@@ -435,12 +424,6 @@ RuntimeScriptValue Sc_DrawingSurface_DrawLine(void *self, const RuntimeScriptVal
     API_OBJCALL_VOID_PINT5(ScriptDrawingSurface, DrawingSurface_DrawLine);
 }
 
-// void (ScriptDrawingSurface *sds, int xx, int yy, int wid, int font, int msgm)
-RuntimeScriptValue Sc_DrawingSurface_DrawMessageWrapped(void *self, const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_OBJCALL_VOID_PINT5(ScriptDrawingSurface, DrawingSurface_DrawMessageWrapped);
-}
-
 // void (ScriptDrawingSurface *sds, int x, int y)
 RuntimeScriptValue Sc_DrawingSurface_DrawPixel(void *self, const RuntimeScriptValue *params, int32_t param_count)
 {
@@ -469,7 +452,10 @@ RuntimeScriptValue Sc_DrawingSurface_DrawStringWrapped_Old(void *self, const Run
 
 RuntimeScriptValue Sc_DrawingSurface_DrawStringWrapped(void *self, const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_OBJCALL_VOID_PINT5_POBJ(ScriptDrawingSurface, DrawingSurface_DrawStringWrapped, const char);
+    API_OBJCALL_SCRIPT_SPRINTF(DrawingSurface_DrawString, 6);
+    DrawingSurface_DrawStringWrapped((ScriptDrawingSurface*)self, params[0].IValue, params[1].IValue, params[2].IValue,
+        params[3].IValue, params[4].IValue, scsf_buffer);
+    return RuntimeScriptValue((int32_t)0);
 }
 
 RuntimeScriptValue Sc_DrawingSurface_DrawSurface(void *self, const RuntimeScriptValue *params, int32_t param_count)
@@ -538,11 +524,16 @@ RuntimeScriptValue Sc_DrawingSurface_GetWidth(void *self, const RuntimeScriptVal
 //
 //=============================================================================
 
-// void (ScriptDrawingSurface *sds, int xx, int yy, int font, const char* texx, ...)
 void ScPl_DrawingSurface_DrawString(ScriptDrawingSurface *sds, int xx, int yy, int font, const char* texx, ...)
 {
     API_PLUGIN_SCRIPT_SPRINTF(texx);
     DrawingSurface_DrawString(sds, xx, yy, font, scsf_buffer);
+}
+
+void ScPl_DrawingSurface_DrawStringWrapped(ScriptDrawingSurface *sds, int xx, int yy, int wid, int font, int alignment, const char *msg, ...)
+{
+    API_PLUGIN_SCRIPT_SPRINTF(msg);
+    DrawingSurface_DrawStringWrapped(sds, xx, yy, wid, font, alignment, scsf_buffer);
 }
 
 void RegisterDrawingSurfaceAPI(ScriptAPIVersion base_api, ScriptAPIVersion /*compat_api*/)
@@ -553,7 +544,6 @@ void RegisterDrawingSurfaceAPI(ScriptAPIVersion base_api, ScriptAPIVersion /*com
         { "DrawingSurface::DrawCircle^3",         API_FN_PAIR(DrawingSurface_DrawCircle) },
         { "DrawingSurface::DrawImage^10",         API_FN_PAIR(DrawingSurface_DrawImage) },
         { "DrawingSurface::DrawLine^5",           API_FN_PAIR(DrawingSurface_DrawLine) },
-        { "DrawingSurface::DrawMessageWrapped^5", API_FN_PAIR(DrawingSurface_DrawMessageWrapped) },
         { "DrawingSurface::DrawStringWrapped^6",  API_FN_PAIR(DrawingSurface_DrawStringWrapped) },
         { "DrawingSurface::DrawPixel^2",          API_FN_PAIR(DrawingSurface_DrawPixel) },
         { "DrawingSurface::DrawRectangle^4",      API_FN_PAIR(DrawingSurface_DrawRectangle) },
@@ -572,4 +562,9 @@ void RegisterDrawingSurfaceAPI(ScriptAPIVersion base_api, ScriptAPIVersion /*com
     };
 
     ccAddExternalFunctions(drawsurf_api);
+    {
+    }
+    { // old non-variadic and new variadic variants
+        ccAddExternalObjectFunction("DrawingSurface::DrawStringWrapped^106", Sc_DrawingSurface_DrawStringWrapped, (void*)ScPl_DrawingSurface_DrawStringWrapped);
+    }
 }

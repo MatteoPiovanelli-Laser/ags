@@ -147,37 +147,16 @@ struct CharacterInfo {
 	void update_character_idle(CharacterExtras *chex, int &doing_nothing);
 	void update_character_follower(int &char_index, std::vector<int> &followingAsSheep, int &doing_nothing);
 
-    void ReadFromFile(Common::Stream *in, GameDataVersion data_ver, int save_ver = -1);
+    void ReadFromFile(Common::Stream *in, GameDataVersion data_ver);
     void WriteToFile(Common::Stream *out) const;
+    // TODO: move to runtime-only class (?)
+    void ReadFromSavegame(Common::Stream *in, int save_ver);
+    void WriteToSavegame(Common::Stream *out) const;
+
+private:
+    // TODO: this is likely temp here until runtime class is factored out
+    void ReadFromFileImpl(Common::Stream *in, GameDataVersion data_ver, int save_ver);
+    void WriteToFileImpl(Common::Stream *out, bool is_save) const;
 };
-
-
-#if defined (OBSOLETE)
-struct OldCharacterInfo {
-    int   defview;
-    int   talkview;
-    int   view;
-    int   room, prevroom;
-    int   x, y, wait;
-    int   flags;
-    short following;
-    short followinfo;
-    int   idleview;           // the loop will be randomly picked
-    short idletime, idleleft; // num seconds idle before playing anim
-    short transparency;       // if character is transparent
-    short baseline;
-    int   activeinv;          // this is an INT to support SeeR (no signed shorts)
-    short loop, frame;
-    short walking, animating;
-    short walkspeed, animspeed;
-    short inv[100];
-    short actx__, acty__;
-    char  name[30];
-    char  scrname[16];
-    char  on;
-};
-
-void ConvertOldCharacterToNew (OldCharacterInfo *oci, CharacterInfo *ci);
-#endif // OBSOLETE
 
 #endif // __AC_CHARACTERINFO_H

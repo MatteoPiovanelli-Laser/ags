@@ -38,7 +38,6 @@ using namespace AGS::Common;
 extern TopBarSettings topBar;
 extern GameState play;
 extern RoomStruct thisroom;
-extern int display_message_aschar;
 extern GameSetupStruct game;
 
 void DisplayAtYImpl(int ypos, const char *texx, bool as_speech);
@@ -92,64 +91,10 @@ void DisplayTopBar(int ypos, int ttexcol, int backcol, const char *title, const 
     DisplayAtY(play.top_bar_ypos, text);
 }
 
-// Display a room/global message in the bar
-void DisplayMessageBar(int ypos, int ttexcol, int backcol, const char *title, int msgnum) {
-    char msgbufr[3001];
-    get_message_text(msgnum, msgbufr);
-    DisplayTopBar(ypos, ttexcol, backcol, title, msgbufr);
-}
-
-void DisplayMessageAtY(int msnum, int ypos) {
-    char msgbufr[3001];
-    if (msnum>=500) {
-        get_message_text (msnum, msgbufr);
-        if (display_message_aschar > 0)
-            DisplaySpeech(msgbufr, display_message_aschar);
-        else
-            DisplayAtY(ypos, msgbufr);
-        display_message_aschar=0;
-        return;
-    }
-
-    if (display_message_aschar > 0) {
-        display_message_aschar=0;
-        quit("!DisplayMessage: data column specified a character for local\n"
-            "message; use the message editor to select the character for room\n"
-            "messages.\n");
-    }
-
-    int repeatloop=1;
-    while (repeatloop) {
-        get_message_text (msnum, msgbufr);
-
-        if (thisroom.MessageInfos[msnum].DisplayAs > 0) {
-            DisplaySpeech(msgbufr, thisroom.MessageInfos[msnum].DisplayAs - 1);
-        }
-        else {
-            // time out automatically if they have set that
-            int oldGameSkipDisp = play.skip_display;
-            if (thisroom.MessageInfos[msnum].Flags & MSG_TIMELIMIT)
-                play.skip_display = 0;
-
-            DisplayAtY(ypos, msgbufr);
-
-            play.skip_display = oldGameSkipDisp;
-        }
-        if (thisroom.MessageInfos[msnum].Flags & MSG_DISPLAYNEXT) {
-            msnum++;
-            repeatloop=1;
-        }
-        else
-            repeatloop=0;
-    }
-
-}
-
-void DisplayMessage(int msnum) {
-    DisplayMessageAtY (msnum, -1);
-}
-
 void DisplayAt(int xxp,int yyp,int widd, const char* text) {
+    if (play.screen_is_faded_out > 0)
+        debug_script_warn("Warning: blocking Display call during fade-out.");
+
     if (widd<1) widd=play.GetUIViewport().GetWidth()/2;
     if (xxp<0) xxp=play.GetUIViewport().GetWidth()/2-widd/2;
     _display_at(xxp, yyp, widd, text, DISPLAYTEXT_MESSAGEBOX, 0, 0, 0, false);
@@ -159,6 +104,8 @@ void DisplayAtYImpl(int ypos, const char *texx, bool as_speech) {
     const Rect &ui_view = play.GetUIViewport();
     if ((ypos < -1) || (ypos >= ui_view.GetHeight()))
         quitprintf("!DisplayAtY: invalid Y co-ordinate supplied (used: %d; valid: 0..%d)", ypos, ui_view.GetHeight());
+    if (play.screen_is_faded_out > 0)
+        debug_script_warn("Warning: blocking Display call during fade-out.");
 
     // Display("") ... a bit of a stupid thing to do, so ignore it
     if (texx[0] == 0)

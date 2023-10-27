@@ -33,8 +33,9 @@ GUIButton::GUIButton()
     _image = -1;
     _mouseOverImage = -1;
     _pushedImage = -1;
-    _currentImage = -1;
     _imageFlags = 0;
+    _currentImage = -1;
+    _curImageFlags = 0;
     Font = 0;
     TextColor = 0;
     TextAlignment = kAlignTopCenter;
@@ -183,7 +184,7 @@ void GUIButton::SetMouseOverImage(int32_t image)
 {
     if (_mouseOverImage == image)
         return;
-    
+
     _mouseOverImage = image;
     UpdateCurrentImage();
 }
@@ -192,7 +193,7 @@ void GUIButton::SetNormalImage(int32_t image)
 {
     if (_image == image)
         return;
-    
+
     _image = image;
     UpdateCurrentImage();
 }
@@ -201,8 +202,17 @@ void GUIButton::SetPushedImage(int32_t image)
 {
     if (_pushedImage == image)
         return;
-    
+
     _pushedImage = image;
+    UpdateCurrentImage();
+}
+
+void GUIButton::SetImages(int32_t normal, int32_t over, int32_t pushed, uint32_t flags)
+{
+    _image = normal;
+    _mouseOverImage = over;
+    _pushedImage = pushed;
+    _imageFlags = flags;
     UpdateCurrentImage();
 }
 
@@ -213,11 +223,10 @@ int32_t GUIButton::CurrentImage() const
 
 void GUIButton::SetCurrentImage(int32_t new_image, uint32_t flags)
 {
-    if (_currentImage == new_image && _imageFlags == flags)
+    if (_currentImage == new_image && _curImageFlags == flags)
         return;
-    
     _currentImage = new_image;
-    _imageFlags = flags;
+    _curImageFlags = flags;
     MarkChanged();
 }
 
@@ -246,74 +255,63 @@ void GUIButton::SetText(const String &text)
 
 bool GUIButton::OnMouseDown()
 {
-    int new_image = (_pushedImage > 0) ? _pushedImage : _currentImage;
+    IsPushed = true;
     if (!IsImageButton())
         MarkChanged();
-    SetCurrentImage(new_image);
-    IsPushed = true;
+    UpdateCurrentImage();
     return false;
 }
 
 void GUIButton::OnMouseEnter()
 {
-    int new_image = (IsPushed && _pushedImage > 0) ? _pushedImage :
-        (_mouseOverImage > 0) ? _mouseOverImage : _image;
-    if (IsPushed && !IsImageButton())
-    {
-        MarkChanged();
-    }
-    SetCurrentImage(new_image);
     IsMouseOver = true;
+    if (IsPushed && !IsImageButton())
+        MarkChanged();
+    UpdateCurrentImage();
 }
 
 void GUIButton::OnMouseLeave()
 {
-    if (IsPushed && !IsImageButton())
-    {
-        MarkChanged();
-    }
-    SetCurrentImage(_image);
     IsMouseOver = false;
+    if (IsPushed && !IsImageButton())
+        MarkChanged();
+    UpdateCurrentImage();
 }
 
 void GUIButton::OnMouseUp()
 {
-    int new_image = _image;
     if (IsMouseOver)
     {
-        if (_mouseOverImage > 0)
-            new_image = _mouseOverImage;
         if (IsGUIEnabled(this) && IsClickable())
             IsActivated = true;
     }
 
-    if (IsPushed && !IsImageButton())
-    {
-        MarkChanged();
-    }
-    SetCurrentImage(new_image);
     IsPushed = false;
+    if (IsPushed && !IsImageButton())
+        MarkChanged();
+    UpdateCurrentImage();
 }
 
 void GUIButton::UpdateCurrentImage()
 {
-    int was_image = _currentImage;
+    int new_image = _currentImage;
+    uint32_t new_flags = 0;
 
     if (IsPushed && (_pushedImage > 0))
     {
-        _currentImage = _pushedImage;
+        new_image = _pushedImage;
     }
     else if (IsMouseOver && (_mouseOverImage > 0))
     {
-        _currentImage = _mouseOverImage;
+        new_image = _mouseOverImage;
     }
     else
     {
-        _currentImage = _image;
+        new_image = _image;
+        new_flags = _imageFlags;
     }
 
-    if (was_image != _currentImage)
-        MarkChanged();
+    SetCurrentImage(new_image, new_flags);
 }
 
 void GUIButton::WriteToFile(Stream *out) const
@@ -382,6 +380,8 @@ void GUIButton::ReadFromSavegame(Stream *in, GuiSvgVersion svg_ver)
     // Update current state after reading
     IsPushed = false;
     IsMouseOver = false;
+    _curImageFlags = _imageFlags;
+    UpdateCurrentImage();
 }
 
 void GUIButton::WriteToSavegame(Stream *out) const
@@ -412,7 +412,7 @@ void GUIButton::DrawImageButton(Bitmap *ds, int x, int y, bool draw_disabled)
         ds->SetClip(RectWH(x, y, _width, _height));
 
     if (spriteset.DoesSpriteExist(_currentImage))
-        draw_gui_sprite_flipped(ds, _currentImage, x, y, kBlend_Normal, _imageFlags & VFLG_FLIPSPRITE);
+        draw_gui_sprite_flipped(ds, _currentImage, x, y, kBlend_Normal, _curImageFlags & VFLG_FLIPSPRITE);
 
     // Draw active inventory item
     if (_placeholder != kButtonPlace_None && gui_inv_pic >= 0)

@@ -1908,7 +1908,7 @@ void AGS::Parser::ParseExpression_New(SrcList &expression, EvaluationResult &ere
     ParseExpression_CheckArgOfNew(argument_vartype);
     
     bool const is_managed = _sym.IsManagedVartype(argument_vartype);
-    bool const with_bracket_expr = !expression.ReachedEOF(); // "new FOO[BAR]"
+    bool const with_bracket_expr = kKW_OpenBracket == expression.PeekNext(); // "new FOO[BAR]"
 
     Vartype element_vartype = kKW_NoSymbol;
     if (with_bracket_expr)
@@ -1936,6 +1936,14 @@ void AGS::Parser::ParseExpression_New(SrcList &expression, EvaluationResult &ere
             UserError("Expected '[' after the built-in type '%s'", _sym.GetName(argument_vartype).c_str());
         if (!is_managed)
             UserError("Expected '[' after the integer type '%s'", _sym.GetName(argument_vartype).c_str());
+
+        if (kKW_OpenParenthesis == expression.PeekNext())
+        {
+            Warning("'()' after 'new' isn't implemented, is currently ignored");
+            expression.GetNext();
+            SkipTo(SymbolList{}, expression);
+            expression.GetNext();
+        }
 
         // Only do this check for new, not for new[]. 
         if (0 == _sym.GetSize(argument_vartype))
@@ -4613,8 +4621,8 @@ void AGS::Parser::Parse_CheckTQ(TypeQualifierSet tqs, bool in_func_body, bool in
 
     if (tqs[TQ::kAutoptr])
     {
-        if (!tqs[TQ::kBuiltin] || !tqs[TQ::kManaged])
-            UserError("'autoptr' must be combined with 'builtin' and 'managed'");
+        if (!tqs[TQ::kManaged])
+            UserError("'autoptr' must be combined with 'managed'");
     }
 
     // Note: 'builtin' does not always presuppose 'managed'
@@ -6780,13 +6788,21 @@ void AGS::Parser::Parse()
         _scrip.ReplaceLabels();
         Symbol first_unresolved_function = _callpointLabels.GetFirstUnresolvedFunction();
         if (kKW_NoSymbol != first_unresolved_function)
+        {
+            // We're at the end of the file, so set the cursor to the loc of the function
+            size_t const error_loc = _sym[first_unresolved_function].Declared;
+            if (error_loc != SymbolTable::kNoSrcLocation)
+                _src.SetCursor(error_loc);
             UserError(
-                "Local function '%s' has been referenced in this file but never defined with body",
+                "The local function '%s' is never defined with body (did you forget 'import'?)",
                 _sym.GetName(first_unresolved_function).c_str());
+        }
+
         first_unresolved_function = _importLabels.GetFirstUnresolvedFunction();
         if (kKW_NoSymbol != first_unresolved_function)
-            UserError(
-                "Imported function '%s' has been referenced in this file but never defined",
+            // This shouldn't be possible.
+            InternalError(
+                "The 'import' function '%s' has been referenced in this file but never defined",
                 _sym.GetName(first_unresolved_function).c_str());
 
         Parse_CheckForUnresolvedStructForwardDecls();

@@ -128,7 +128,7 @@ void main_print_help() {
 #endif
            "  --gfxfilter FILTER [SCALING]\n"
            "                               Request graphics filter. Available options:\n"           
-           "                                 none, linear, stdscale\n"
+           "                                 stdscale, linear\n"
            "                               (support may differ between graphic drivers);\n"
            "                               Scaling is specified as:\n"
            "                                 proportional, round, stretch,\n"
@@ -262,14 +262,6 @@ static int main_process_cmdline(ConfigTree &cfg, int argc, char *argv[])
             usetup.opt_audio_dir = argv[ee + 3];
             usetup.opt_voice_dir = argv[ee + 4];
             ee += 4;
-        }
-        else if (ags_stricmp(arg,"--takeover")==0) {
-            if (argc < ee+2)
-                break;
-            play.takeover_data = atoi (argv[ee + 1]);
-            strncpy (play.takeover_from, argv[ee + 2], 49);
-            play.takeover_from[49] = 0;
-            ee += 2;
         }
         else if (ags_stricmp(arg, "--clear-cache-on-room-change") == 0)
             cfg["misc"]["clear_cache_on_room_change"] = "1";
