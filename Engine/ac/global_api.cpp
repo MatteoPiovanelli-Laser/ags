@@ -55,7 +55,6 @@
 #include "media/audio/audio_system.h"
 
 #include "ac/dynobj/scriptstring.h"
-extern ScriptString myScriptStringImpl;
 
 // void (char*texx, ...)
 RuntimeScriptValue Sc_sc_AbortGame(const RuntimeScriptValue *params, int32_t param_count)
@@ -526,12 +525,6 @@ RuntimeScriptValue Sc_GetDrawingSurfaceForWalkableArea(const RuntimeScriptValue 
 RuntimeScriptValue Sc_GetDrawingSurfaceForWalkbehind(const RuntimeScriptValue *params, int32_t param_count)
 {
     API_SCALL_OBJAUTO(ScriptDrawingSurface, GetDrawingSurfaceForWalkbehind);
-}
-
-// void (int amnt) 
-RuntimeScriptValue Sc_GiveScore(const RuntimeScriptValue *params, int32_t param_count)
-{
-    API_SCALL_VOID_PINT(GiveScore);
 }
 
 // int (int roomnum)
@@ -1264,7 +1257,6 @@ void RegisterGlobalAPI()
         { "GetWalkableAreaAtScreen",  API_FN_PAIR(GetWalkableAreaAtScreen) },
         { "GetDrawingSurfaceForWalkableArea", API_FN_PAIR(GetDrawingSurfaceForWalkableArea) },
         { "GetDrawingSurfaceForWalkbehind", API_FN_PAIR(GetDrawingSurfaceForWalkbehind) },
-        { "GiveScore",                API_FN_PAIR(GiveScore) },
         { "HasPlayerBeenInRoom",      API_FN_PAIR(HasPlayerBeenInRoom) },
         { "InputBox",                 API_FN_PAIR(sc_inputbox) },
         { "InterfaceOff",             API_FN_PAIR(InterfaceOff) },

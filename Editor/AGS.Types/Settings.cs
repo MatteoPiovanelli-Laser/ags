@@ -75,7 +75,6 @@ namespace AGS.Types
         private ScriptAPIVersion _scriptCompatLevelReal = Utilities.GetActualAPI(ScriptAPIVersion.Highest);
         private bool _oldKeyHandling = false;
         private bool _scaleCharacterSpriteOffsets = true;
-        private int _playSoundOnScore = -1;
         private int _dialogOptionsGUI = 0;
         private int _dialogOptionsGap = 0;
         private int _dialogBulletImage = 0;
@@ -97,7 +96,6 @@ namespace AGS.Types
         private bool _backwardsText = false;
         private int _uniqueID;
 		private Guid _guid;
-        private int _totalScore = 0;
         private bool _runGameLoopsWhileDialogOptionsDisplayed = false;
         private InventoryHotspotMarker _inventoryHotspotMarker = new InventoryHotspotMarker();
         private int _defRoomMaskResolution = 1;
@@ -653,16 +651,9 @@ namespace AGS.Types
             set { _oldKeyHandling = value; }
         }
 
-        [DisplayName("Play sound when the player gets points")]
-        [Description("This sound number will be played whenever the player scores points (0 to disable)")]
-        [DefaultValue(AudioClip.FixedIndexNoValue)]
-        [Category("Sound")]
-        [TypeConverter(typeof(AudioClipTypeConverter))]
-        public int PlaySoundOnScore
-        {
-            get { return _playSoundOnScore; }
-            set { _playSoundOnScore = value; }
-        }
+        [Obsolete]
+        [Browsable(false)]
+        public int PlaySoundOnScore { get; }
 
         [Obsolete]
         [Browsable(false)]
@@ -882,14 +873,9 @@ namespace AGS.Types
             set { _backwardsText = value; }
         }
 
-        [DisplayName("Maximum possible score")]
-        [Description("The maximum score that the player can achieve (displayed by @TOTALSCORE@ on GUI labels)")]
-        [Category("(Basic properties)")]
-        public int MaximumScore
-        {
-            get { return _totalScore; }
-            set { _totalScore = value; }
-        }
+        [Obsolete]
+        [Browsable(false)]
+        public int MaximumScore { get; }
 
         [Obsolete]
         [Browsable(false)]
@@ -1069,7 +1055,6 @@ namespace AGS.Types
 
         public void FromXml(XmlNode node)
         {
-            _totalScore = 0;
 			_guid = Guid.Empty;
 			_description = string.Empty;
 			_releaseDate = DateTime.Now;
@@ -1099,7 +1084,7 @@ namespace AGS.Types
         [DisplayName("Render sprites at screen resolution")]
         [Description("When drawing zoomed character and object sprites, AGS will take advantage of higher runtime resolution to give scaled images more detail, than it would be possible if the game was displayed in its native resolution. The effect is stronger for low-res games. Keep disabled for pixel-perfect output. Currently supported only by Direct3D and OpenGL renderers.")]
         [DefaultValue(RenderAtScreenResolution.UserDefined)]
-        [Category("(Basic properties)")]
+        [Category("Visual")]
         [TypeConverter(typeof(EnumTypeConverter))]
         public RenderAtScreenResolution RenderAtScreenResolution
         {

@@ -65,7 +65,6 @@ extern CCObject    ccDynamicObject;
 extern CCDialog    ccDynamicDialog;
 extern CCAudioChannel ccDynamicAudio;
 extern CCAudioClip ccDynamicAudioClip;
-extern ScriptString myScriptStringImpl;
 extern ScriptObject scrObj[MAX_ROOM_OBJECTS];
 extern std::vector<ScriptGUI> scrGui;
 extern ScriptHotspot scrHotspot[MAX_ROOM_HOTSPOTS];
@@ -452,7 +451,6 @@ HGameInitError InitGameState(const LoadedGameEntities &ents, GameDataVersion dat
         svg_suffix.Format(".%s", game.saveGameFileExtension);
     set_save_game_suffix(svg_suffix);
 
-    play.score_sound = game.scoreClipID;
     play.fade_effect = game.options[OPT_FADETYPE];
 
     //
@@ -475,7 +473,6 @@ HGameInitError InitGameState(const LoadedGameEntities &ents, GameDataVersion dat
     // require access to script API at initialization time.
     //
     ccSetScriptAliveTimer(1000 / 60u, 1000u, 150000u);
-    ccSetStringClassImpl(&myScriptStringImpl);
     setup_script_exports(base_api, compat_api);
 
     //

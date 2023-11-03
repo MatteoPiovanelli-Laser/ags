@@ -1699,6 +1699,7 @@ void OGLGraphicsDriver::UpdateTextureRegion(OGLTextureTile *tile, Bitmap *bitmap
   fixedTile.y = tile->y;
   fixedTile.width = std::min(tile->width, tileWidth);
   fixedTile.height = std::min(tile->height, tileHeight);
+
   if (opaque)
     BitmapToVideoMemOpaque(bitmap, &fixedTile, memPtr, pitch);
   else
